@@ -17,6 +17,8 @@ import {
 } from "@workspace/api-zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { logger } from "../lib/logger";
+import fs from "fs";
+import path from "path";
 
 const router: IRouter = Router();
 
@@ -257,19 +259,7 @@ router.post("/items/:id/process", async (req, res): Promise<void> => {
     .set({ status: "processing" })
     .where(eq(knowledgeItemsTable.id, item.id));
 
-  const contentToProcess =
-    item.rawContent ??
-    item.sourceUrl ??
-    item.title;
-
-  try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-5.4",
-      max_completion_tokens: 4096,
-      messages: [
-        {
-          role: "system",
-          content: `You are a knowledge extraction AI. Given content from a ${item.sourceType} source, you must:
+  const systemPrompt = `You are a knowledge extraction AI. Given content from a ${item.sourceType} source, you must:
 1. Write a concise summary (2-4 sentences)
 2. Create structured notes in Markdown format with clear headings, bullet points, and bold key terms
 3. Extract 5-10 key concepts as short phrases
@@ -279,14 +269,66 @@ Respond ONLY with valid JSON in this exact format:
   "summary": "...",
   "structuredNotes": "# Title\\n\\n## Key Points\\n- ...",
   "keyConcepts": ["concept1", "concept2"]
-}`,
-        },
-        {
-          role: "user",
-          content: `Title: ${item.title}\nSource type: ${item.sourceType}\nContent: ${contentToProcess?.substring(0, 8000) ?? "(no content)"}`,
-        },
-      ],
-    });
+}`;
+
+  try {
+    let response;
+
+    if (item.sourceType === "image" && item.imageUrl) {
+      // For images: read file from disk and send to vision model
+      const filename = path.basename(item.imageUrl);
+      const filePath = path.join(process.cwd(), "uploads", filename);
+
+      if (fs.existsSync(filePath)) {
+        const fileBuffer = fs.readFileSync(filePath);
+        const base64 = fileBuffer.toString("base64");
+        const ext = path.extname(filename).slice(1).toLowerCase();
+        const mimeType =
+          ext === "jpg" || ext === "jpeg" ? "image/jpeg" :
+          ext === "png" ? "image/png" :
+          ext === "gif" ? "image/gif" :
+          ext === "webp" ? "image/webp" : "image/jpeg";
+
+        response = await openai.chat.completions.create({
+          model: "gpt-4o",
+          max_completion_tokens: 4096,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          messages: [
+            { role: "system", content: systemPrompt },
+            {
+              role: "user",
+              content: [
+                { type: "text" as const, text: `Title: ${item.title}\nAnalyze this image thoroughly and extract all visible text, data, concepts, and meaningful information.` },
+                { type: "image_url" as const, image_url: { url: `data:${mimeType};base64,${base64}`, detail: "high" as const } },
+              ],
+            },
+          ],
+        });
+      } else {
+        // Image file missing — fall back to text model with title only
+        response = await openai.chat.completions.create({
+          model: "gpt-5.4",
+          max_completion_tokens: 2048,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `Title: ${item.title}\nSource type: image\n(Image file not accessible)` },
+          ],
+        });
+      }
+    } else {
+      const contentToProcess = item.rawContent ?? item.sourceUrl ?? item.title;
+      response = await openai.chat.completions.create({
+        model: "gpt-5.4",
+        max_completion_tokens: 4096,
+        messages: [
+          { role: "system", content: systemPrompt },
+          {
+            role: "user",
+            content: `Title: ${item.title}\nSource type: ${item.sourceType}\nContent: ${contentToProcess?.substring(0, 8000) ?? "(no content)"}`,
+          },
+        ],
+      });
+    }
 
     const content = response.choices[0]?.message?.content ?? "{}";
     let parsed: {

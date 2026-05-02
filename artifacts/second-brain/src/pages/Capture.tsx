@@ -319,13 +319,13 @@ export function Capture() {
                     </button>
                   </div>
                 ) : (
-                  <>
+                  <div className="pointer-events-none">
                     <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
                     <p className="text-sm text-muted-foreground">
                       Drop an image here or <span className="text-primary font-medium">click to browse</span>
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">PNG, JPG, GIF, WebP up to 50MB</p>
-                  </>
+                  </div>
                 )}
               </div>
 
