@@ -1,7 +1,7 @@
 import { useListItems, useGetItemStats, getGetItemStatsQueryKey } from "@workspace/api-client-react";
+import { useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
 import { ItemCard } from "@/components/ItemCard";
-import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Link2, Image, FileText, Brain, TrendingUp, Clock } from "lucide-react";
@@ -24,9 +24,9 @@ function StatCard({
         <Icon className="w-5 h-5" />
       </div>
       <div>
-        <p className="text-2xl font-bold text-foreground">
-          {value ?? <Skeleton className="h-7 w-10 inline-block" />}
-        </p>
+        <div className="text-2xl font-bold text-foreground h-8 flex items-center">
+          {value !== undefined ? value : <Skeleton className="h-7 w-10" />}
+        </div>
         <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
       </div>
     </div>
@@ -34,7 +34,8 @@ function StatCard({
 }
 
 export function Dashboard() {
-  const { data: stats, isLoading: statsLoading } = useGetItemStats({
+  const [, setLocation] = useLocation();
+  const { data: stats } = useGetItemStats({
     query: { queryKey: getGetItemStatsQueryKey() },
   });
   const { data: items, isLoading: itemsLoading } = useListItems();
@@ -52,12 +53,14 @@ export function Dashboard() {
               Your second brain — always learning, always ready.
             </p>
           </div>
-          <Link href="/capture">
-            <Button data-testid="button-capture-new" className="gap-2">
-              <Plus className="w-4 h-4" />
-              Capture
-            </Button>
-          </Link>
+          <Button
+            data-testid="button-capture-new"
+            className="gap-2"
+            onClick={() => setLocation("/capture")}
+          >
+            <Plus className="w-4 h-4" />
+            Capture
+          </Button>
         </div>
 
         {/* Stats */}
@@ -106,9 +109,12 @@ export function Dashboard() {
               <Clock className="w-4 h-4 text-muted-foreground" />
               <h2 className="text-sm font-semibold text-foreground">Recent Captures</h2>
             </div>
-            <Link href="/library">
-              <a className="text-xs text-primary hover:underline">View all</a>
-            </Link>
+            <button
+              onClick={() => setLocation("/library")}
+              className="text-xs text-primary hover:underline"
+            >
+              View all
+            </button>
           </div>
 
           {itemsLoading ? (
@@ -126,12 +132,13 @@ export function Dashboard() {
               <p className="text-sm text-muted-foreground max-w-sm mb-6">
                 Start capturing knowledge from links, images, and text. The AI will organize everything for you.
               </p>
-              <Link href="/capture">
-                <Button data-testid="button-start-capture">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Capture your first item
-                </Button>
-              </Link>
+              <Button
+                data-testid="button-start-capture"
+                onClick={() => setLocation("/capture")}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Capture your first item
+              </Button>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
