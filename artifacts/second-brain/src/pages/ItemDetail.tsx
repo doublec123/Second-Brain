@@ -44,26 +44,54 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+type Block =
+  | { type: "h1" | "h2" | "h3" | "hr" | "blank" | "p"; text: string; key: number }
+  | { type: "ul"; items: string[]; key: number };
+
 function MarkdownNotes({ content }: { content: string }) {
   const lines = content.split("\n");
+
+  // Group consecutive list lines into a single ul block
+  const blocks: Block[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.startsWith("- ") || line.startsWith("* ")) {
+      const items: string[] = [];
+      while (i < lines.length && (lines[i].startsWith("- ") || lines[i].startsWith("* "))) {
+        items.push(lines[i].slice(2));
+        i++;
+      }
+      blocks.push({ type: "ul", items, key: i });
+    } else {
+      if (line.startsWith("# ")) blocks.push({ type: "h1", text: line.slice(2), key: i });
+      else if (line.startsWith("## ")) blocks.push({ type: "h2", text: line.slice(3), key: i });
+      else if (line.startsWith("### ")) blocks.push({ type: "h3", text: line.slice(4), key: i });
+      else if (line.startsWith("---")) blocks.push({ type: "hr", text: "", key: i });
+      else if (line.trim() === "") blocks.push({ type: "blank", text: "", key: i });
+      else blocks.push({ type: "p", text: line, key: i });
+      i++;
+    }
+  }
+
   return (
     <div className="prose-notes">
-      {lines.map((line, i) => {
-        if (line.startsWith("# ")) return <h1 key={i}>{line.slice(2)}</h1>;
-        if (line.startsWith("## ")) return <h2 key={i}>{line.slice(3)}</h2>;
-        if (line.startsWith("### ")) return <h3 key={i}>{line.slice(4)}</h3>;
-        if (line.startsWith("- ") || line.startsWith("* ")) {
+      {blocks.map((block) => {
+        if (block.type === "h1") return <h1 key={block.key}>{block.text}</h1>;
+        if (block.type === "h2") return <h2 key={block.key}>{block.text}</h2>;
+        if (block.type === "h3") return <h3 key={block.key}>{block.text}</h3>;
+        if (block.type === "hr") return <hr key={block.key} />;
+        if (block.type === "blank") return <div key={block.key} className="h-2" />;
+        if (block.type === "ul") {
           return (
-            <ul key={i}>
-              <li dangerouslySetInnerHTML={{ __html: formatInline(line.slice(2)) }} />
+            <ul key={block.key}>
+              {block.items.map((item, j) => (
+                <li key={j} dangerouslySetInnerHTML={{ __html: formatInline(item) }} />
+              ))}
             </ul>
           );
         }
-        if (line.startsWith("---")) return <hr key={i} />;
-        if (line.trim() === "") return <div key={i} className="h-2" />;
-        return (
-          <p key={i} dangerouslySetInnerHTML={{ __html: formatInline(line) }} />
-        );
+        return <p key={block.key} dangerouslySetInnerHTML={{ __html: formatInline(block.text) }} />;
       })}
     </div>
   );
@@ -240,21 +268,22 @@ export function ItemDetail() {
             )}
           </div>
 
-          {/* Status */}
+          {/* Status — single expression so React never uses comment anchors */}
           <div className="flex items-center gap-2">
-            {item.status === "ready" && (
+            {item.status === "ready" ? (
               <span className="flex items-center gap-1 text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-1 rounded-full font-medium">
-                <CheckCircle className="w-3 h-3" /> Ready
+                <CheckCircle className="w-3 h-3" />
+                <span>Ready</span>
               </span>
-            )}
-            {item.status === "processing" && (
+            ) : item.status === "processing" ? (
               <span className="flex items-center gap-1 text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-1 rounded-full font-medium">
-                <Loader2 className="w-3 h-3 animate-spin" /> Processing
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span>Processing</span>
               </span>
-            )}
-            {item.status === "pending" && (
+            ) : (
               <span className="flex items-center gap-1 text-xs bg-muted text-muted-foreground px-2 py-1 rounded-full font-medium">
-                <Clock className="w-3 h-3" /> Pending
+                <Clock className="w-3 h-3" />
+                <span>Pending</span>
               </span>
             )}
           </div>
@@ -364,9 +393,13 @@ export function ItemDetail() {
                 <p className="text-xs text-muted-foreground mb-4">
                   Click "Re-process" to let AI extract insights from this item.
                 </p>
-                <Button size="sm" onClick={handleReprocess} disabled={processItem.isPending}>
-                  {processItem.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                  Analyze Now
+                <Button size="sm" onClick={handleReprocess} disabled={processItem.isPending} className="gap-2">
+                  {processItem.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4" />
+                  )}
+                  <span>Analyze Now</span>
                 </Button>
               </div>
             )}
