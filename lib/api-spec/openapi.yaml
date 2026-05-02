@@ -3,20 +3,25 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Second Brain API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: items
+    description: Knowledge item operations
+  - name: tags
+    description: Tag operations
+  - name: upload
+    description: File upload operations
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +29,314 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /items:
+    get:
+      operationId: listItems
+      tags: [items]
+      summary: List knowledge items
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: tag
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of knowledge items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KnowledgeItem"
+    post:
+      operationId: createItem
+      tags: [items]
+      summary: Create a new knowledge item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateItemBody"
+      responses:
+        "201":
+          description: Created item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeItem"
+
+  /items/stats:
+    get:
+      operationId: getItemStats
+      tags: [items]
+      summary: Get dashboard statistics
+      responses:
+        "200":
+          description: Statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemStats"
+
+  /items/search:
+    get:
+      operationId: semanticSearch
+      tags: [items]
+      summary: Semantic search across knowledge items
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KnowledgeItem"
+
+  /items/{id}:
+    get:
+      operationId: getItem
+      tags: [items]
+      summary: Get a knowledge item by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Knowledge item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeItem"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateItem
+      tags: [items]
+      summary: Update a knowledge item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateItemBody"
+      responses:
+        "200":
+          description: Updated item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeItem"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteItem
+      tags: [items]
+      summary: Delete a knowledge item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /items/{id}/process:
+    post:
+      operationId: processItem
+      tags: [items]
+      summary: Trigger AI processing of a knowledge item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Processed item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeItem"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /items/{id}/generate-guide:
+    post:
+      operationId: generateGuide
+      tags: [items]
+      summary: Generate a step-by-step guide or roadmap from item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateGuideBody"
+      responses:
+        "200":
+          description: Generated guide
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneratedGuide"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /items/{id}/related:
+    get:
+      operationId: getRelatedItems
+      tags: [items]
+      summary: Get items related to this one
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Related items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KnowledgeItem"
+
+  /items/{id}/export:
+    post:
+      operationId: exportItem
+      tags: [items]
+      summary: Export an item as PDF data
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Export data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportResult"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /tags:
+    get:
+      operationId: listTags
+      tags: [tags]
+      summary: List all tags
+      responses:
+        "200":
+          description: List of tags
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tag"
+    post:
+      operationId: createTag
+      tags: [tags]
+      summary: Create a new tag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTagBody"
+      responses:
+        "201":
+          description: Created tag
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tag"
+
+  /upload:
+    post:
+      operationId: uploadFile
+      tags: [upload]
+      summary: Upload an image or file for processing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadFileBody"
+      responses:
+        "201":
+          description: Uploaded file info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadResult"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +347,239 @@ components:
       required:
         - status
 
+    KnowledgeItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        sourceUrl:
+          type: ["string", "null"]
+        sourceType:
+          type: string
+          enum: [link, image, text]
+        rawContent:
+          type: ["string", "null"]
+        summary:
+          type: ["string", "null"]
+        structuredNotes:
+          type: ["string", "null"]
+        keyConcepts:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [pending, processing, ready]
+        imageUrl:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - sourceType
+        - keyConcepts
+        - tags
+        - status
+        - createdAt
+        - updatedAt
+
+    CreateItemBody:
+      type: object
+      properties:
+        title:
+          type: string
+        sourceUrl:
+          type: string
+        sourceType:
+          type: string
+          enum: [link, image, text]
+        rawContent:
+          type: string
+        imageUrl:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+      required:
+        - title
+        - sourceType
+
+    UpdateItemBody:
+      type: object
+      properties:
+        title:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        summary:
+          type: string
+        structuredNotes:
+          type: string
+
+    ItemStats:
+      type: object
+      properties:
+        total:
+          type: integer
+        byType:
+          type: object
+          properties:
+            link:
+              type: integer
+            image:
+              type: integer
+            text:
+              type: integer
+          required:
+            - link
+            - image
+            - text
+        byStatus:
+          type: object
+          properties:
+            pending:
+              type: integer
+            processing:
+              type: integer
+            ready:
+              type: integer
+          required:
+            - pending
+            - processing
+            - ready
+        recentCount:
+          type: integer
+      required:
+        - total
+        - byType
+        - byStatus
+        - recentCount
+
+    GenerateGuideBody:
+      type: object
+      properties:
+        guideType:
+          type: string
+          enum: [steps, workflow, roadmap]
+      required:
+        - guideType
+
+    GeneratedGuide:
+      type: object
+      properties:
+        title:
+          type: string
+        guideType:
+          type: string
+        content:
+          type: string
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              stepNumber:
+                type: integer
+              title:
+                type: string
+              description:
+                type: string
+            required:
+              - stepNumber
+              - title
+              - description
+      required:
+        - title
+        - guideType
+        - content
+        - steps
+
+    ExportResult:
+      type: object
+      properties:
+        filename:
+          type: string
+        content:
+          type: string
+          description: Markdown content for PDF rendering
+        itemTitle:
+          type: string
+      required:
+        - filename
+        - content
+        - itemTitle
+
+    Tag:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        color:
+          type: string
+        itemCount:
+          type: integer
+      required:
+        - id
+        - name
+        - color
+        - itemCount
+
+    CreateTagBody:
+      type: object
+      properties:
+        name:
+          type: string
+        color:
+          type: string
+      required:
+        - name
+        - color
+
+    UploadFileBody:
+      type: object
+      properties:
+        filename:
+          type: string
+        mimeType:
+          type: string
+        base64Data:
+          type: string
+      required:
+        - filename
+        - mimeType
+        - base64Data
+
+    UploadResult:
+      type: object
+      properties:
+        url:
+          type: string
+        filename:
+          type: string
+      required:
+        - url
+        - filename
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
