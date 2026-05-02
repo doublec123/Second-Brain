@@ -18,6 +18,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Link2, Image, FileText, Upload, Loader2, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+function normalizeUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
 export function Capture() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -37,6 +44,7 @@ export function Capture() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageTags, setImageTags] = useState("");
+  const [imageSubmitting, setImageSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Text form state
@@ -52,42 +60,74 @@ export function Capture() {
     qc.invalidateQueries({ queryKey: getGetItemStatsQueryKey() });
   };
 
-  const handleLinkSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!linkUrl) return;
+  // Kick off processing in the background — navigate first, process after
+  const startProcessing = (itemId: number) => {
+    processItem.mutate(
+      { id: itemId },
+      {
+        onSuccess: () => invalidate(),
+        onError: () => {
+          // silently fail — user can re-process from item detail
+          invalidate();
+        },
+      }
+    );
+  };
 
-    const title = linkTitle || new URL(linkUrl.startsWith("http") ? linkUrl : `https://${linkUrl}`).hostname;
+  const handleLinkSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!linkUrl.trim()) return;
+
+    const url = normalizeUrl(linkUrl);
+    let title = linkTitle.trim();
+    if (!title) {
+      try {
+        title = new URL(url).hostname;
+      } catch {
+        title = url;
+      }
+    }
 
     createItem.mutate(
-      { data: { title, sourceUrl: linkUrl, sourceType: "link", tags: parseTags(linkTags) } },
+      { data: { title, sourceUrl: url, sourceType: "link", tags: parseTags(linkTags) } },
       {
         onSuccess: (item) => {
           invalidate();
           toast({ title: "Link captured!", description: "AI is analyzing it now." });
-          processItem.mutate({ id: item.id }, {
-            onSuccess: () => { invalidate(); setLocation(`/item/${item.id}`); },
-          });
+          setLocation(`/item/${item.id}`);
+          startProcessing(item.id);
         },
-        onError: () => toast({ title: "Failed to capture link", variant: "destructive" }),
+        onError: () => {
+          toast({ title: "Failed to capture link", variant: "destructive" });
+        },
       }
     );
   };
 
   const handleImageSelect = (file: File) => {
     setImageFile(file);
-    setImageTitle(file.name.replace(/\.[^.]+$/, "").replace(/_/g, " "));
+    setImageTitle(file.name.replace(/\.[^.]+$/, "").replace(/[_-]/g, " "));
     const reader = new FileReader();
     reader.onload = (e) => setImagePreview(e.target?.result as string);
     reader.readAsDataURL(file);
   };
 
-  const handleImageSubmit = async (e: React.FormEvent) => {
+  const handleImageSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!imageFile || !imageTitle) return;
+    if (!imageFile || !imageTitle.trim() || imageSubmitting) return;
+
+    setImageSubmitting(true);
 
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const base64Data = (ev.target?.result as string).split(",")[1];
+      const result = ev.target?.result as string;
+      const base64Data = result.split(",")[1];
+      if (!base64Data) {
+        toast({ title: "Could not read image file", variant: "destructive" });
+        setImageSubmitting(false);
+        return;
+      }
+
       uploadFile.mutate(
         { data: { filename: imageFile.name, mimeType: imageFile.type, base64Data } },
         {
@@ -95,7 +135,7 @@ export function Capture() {
             createItem.mutate(
               {
                 data: {
-                  title: imageTitle,
+                  title: imageTitle.trim(),
                   sourceType: "image",
                   imageUrl: upload.url,
                   tags: parseTags(imageTags),
@@ -103,42 +143,62 @@ export function Capture() {
               },
               {
                 onSuccess: (item) => {
+                  setImageSubmitting(false);
                   invalidate();
                   toast({ title: "Image captured!", description: "AI is analyzing it now." });
-                  processItem.mutate({ id: item.id }, {
-                    onSuccess: () => { invalidate(); setLocation(`/item/${item.id}`); },
-                  });
+                  setLocation(`/item/${item.id}`);
+                  startProcessing(item.id);
+                },
+                onError: () => {
+                  setImageSubmitting(false);
+                  toast({ title: "Failed to save image", variant: "destructive" });
                 },
               }
             );
           },
-          onError: () => toast({ title: "Failed to upload image", variant: "destructive" }),
+          onError: () => {
+            setImageSubmitting(false);
+            toast({ title: "Failed to upload image", variant: "destructive" });
+          },
         }
       );
+    };
+    reader.onerror = () => {
+      setImageSubmitting(false);
+      toast({ title: "Could not read image file", variant: "destructive" });
     };
     reader.readAsDataURL(imageFile);
   };
 
-  const handleTextSubmit = async (e: React.FormEvent) => {
+  const handleTextSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!textTitle || !textContent) return;
+    if (!textTitle.trim() || !textContent.trim()) return;
 
     createItem.mutate(
-      { data: { title: textTitle, sourceType: "text", rawContent: textContent, tags: parseTags(textTags) } },
+      {
+        data: {
+          title: textTitle.trim(),
+          sourceType: "text",
+          rawContent: textContent.trim(),
+          tags: parseTags(textTags),
+        },
+      },
       {
         onSuccess: (item) => {
           invalidate();
           toast({ title: "Note captured!", description: "AI is analyzing it now." });
-          processItem.mutate({ id: item.id }, {
-            onSuccess: () => { invalidate(); setLocation(`/item/${item.id}`); },
-          });
+          setLocation(`/item/${item.id}`);
+          startProcessing(item.id);
         },
-        onError: () => toast({ title: "Failed to capture note", variant: "destructive" }),
+        onError: () => {
+          toast({ title: "Failed to save note", variant: "destructive" });
+        },
       }
     );
   };
 
-  const isLoading = createItem.isPending || processItem.isPending || uploadFile.isPending;
+  const linkPending = createItem.isPending && !imageSubmitting;
+  const textPending = createItem.isPending && !imageSubmitting;
 
   return (
     <Layout>
@@ -171,11 +231,11 @@ export function Capture() {
                 <Input
                   id="link-url"
                   data-testid="input-link-url"
-                  type="url"
-                  placeholder="https://example.com/article"
+                  type="text"
+                  placeholder="https://example.com or just example.com"
                   value={linkUrl}
                   onChange={(e) => setLinkUrl(e.target.value)}
-                  required
+                  autoComplete="url"
                 />
               </div>
               <div className="space-y-2">
@@ -183,16 +243,18 @@ export function Capture() {
                 <Input
                   id="link-title"
                   data-testid="input-link-title"
-                  placeholder="Leave blank to auto-detect"
+                  type="text"
+                  placeholder="Leave blank to auto-detect from URL"
                   value={linkTitle}
                   onChange={(e) => setLinkTitle(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="link-tags">Tags (comma-separated)</Label>
+                <Label htmlFor="link-tags">Tags (comma-separated, optional)</Label>
                 <Input
                   id="link-tags"
                   data-testid="input-link-tags"
+                  type="text"
                   placeholder="ai, research, productivity"
                   value={linkTags}
                   onChange={(e) => setLinkTags(e.target.value)}
@@ -201,11 +263,11 @@ export function Capture() {
               <Button
                 type="submit"
                 className="w-full gap-2"
-                disabled={isLoading || !linkUrl}
+                disabled={linkPending || !linkUrl.trim()}
                 data-testid="button-submit-link"
               >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                {isLoading ? "Processing..." : "Capture & Analyze"}
+                {linkPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                {linkPending ? "Saving..." : "Capture & Analyze"}
               </Button>
             </form>
           </TabsContent>
@@ -240,12 +302,18 @@ export function Capture() {
                   }}
                 />
                 {imagePreview ? (
-                  <div className="relative">
+                  <div className="relative inline-block">
                     <img src={imagePreview} alt="Preview" className="max-h-40 mx-auto rounded-lg object-contain" />
                     <button
                       type="button"
                       className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center"
-                      onClick={(e) => { e.stopPropagation(); setImageFile(null); setImagePreview(null); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setImageFile(null);
+                        setImagePreview(null);
+                        setImageTitle("");
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                      }}
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -254,9 +322,9 @@ export function Capture() {
                   <>
                     <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
                     <p className="text-sm text-muted-foreground">
-                      Drop an image here or <span className="text-primary font-medium">browse</span>
+                      Drop an image here or <span className="text-primary font-medium">click to browse</span>
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">PNG, JPG, GIF up to 50MB</p>
+                    <p className="text-xs text-muted-foreground mt-1">PNG, JPG, GIF, WebP up to 50MB</p>
                   </>
                 )}
               </div>
@@ -266,18 +334,19 @@ export function Capture() {
                 <Input
                   id="image-title"
                   data-testid="input-image-title"
+                  type="text"
                   placeholder="What is this image about?"
                   value={imageTitle}
                   onChange={(e) => setImageTitle(e.target.value)}
-                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="image-tags">Tags (comma-separated)</Label>
+                <Label htmlFor="image-tags">Tags (comma-separated, optional)</Label>
                 <Input
                   id="image-tags"
                   data-testid="input-image-tags"
-                  placeholder="screenshot, notes, diagram"
+                  type="text"
+                  placeholder="screenshot, diagram, reference"
                   value={imageTags}
                   onChange={(e) => setImageTags(e.target.value)}
                 />
@@ -285,11 +354,11 @@ export function Capture() {
               <Button
                 type="submit"
                 className="w-full gap-2"
-                disabled={isLoading || !imageFile || !imageTitle}
+                disabled={imageSubmitting || !imageFile || !imageTitle.trim()}
                 data-testid="button-submit-image"
               >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                {isLoading ? "Processing..." : "Capture & Analyze"}
+                {imageSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                {imageSubmitting ? "Uploading..." : "Capture & Analyze"}
               </Button>
             </form>
           </TabsContent>
@@ -302,10 +371,10 @@ export function Capture() {
                 <Input
                   id="text-title"
                   data-testid="input-text-title"
+                  type="text"
                   placeholder="What is this note about?"
                   value={textTitle}
                   onChange={(e) => setTextTitle(e.target.value)}
-                  required
                 />
               </div>
               <div className="space-y-2">
@@ -317,14 +386,14 @@ export function Capture() {
                   className="min-h-48 resize-none font-mono text-sm"
                   value={textContent}
                   onChange={(e) => setTextContent(e.target.value)}
-                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="text-tags">Tags (comma-separated)</Label>
+                <Label htmlFor="text-tags">Tags (comma-separated, optional)</Label>
                 <Input
                   id="text-tags"
                   data-testid="input-text-tags"
+                  type="text"
                   placeholder="ideas, learning, reference"
                   value={textTags}
                   onChange={(e) => setTextTags(e.target.value)}
@@ -333,31 +402,15 @@ export function Capture() {
               <Button
                 type="submit"
                 className="w-full gap-2"
-                disabled={isLoading || !textTitle || !textContent}
+                disabled={textPending || !textTitle.trim() || !textContent.trim()}
                 data-testid="button-submit-text"
               >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                {isLoading ? "Processing..." : "Capture & Analyze"}
+                {textPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                {textPending ? "Saving..." : "Capture & Analyze"}
               </Button>
             </form>
           </TabsContent>
         </Tabs>
-
-        {/* Processing indicator */}
-        {isLoading && (
-          <div className="mt-6 bg-primary/8 border border-primary/20 rounded-xl p-4 flex items-center gap-3">
-            <div className="relative">
-              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-primary" />
-              </div>
-              <div className="absolute inset-0 rounded-full bg-primary/10 animate-ping" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-primary">AI is analyzing your content</p>
-              <p className="text-xs text-muted-foreground">Extracting insights, summarizing, and organizing...</p>
-            </div>
-          </div>
-        )}
       </div>
     </Layout>
   );
