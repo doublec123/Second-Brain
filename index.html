@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Second Brain — AI Knowledge Management App</title>
+    <!-- Google Fonts for Modern Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #050505;
+            --bg-surface: #111111;
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --accent-glow: #3b82f6;
+            --accent-purple: #8b5cf6;
+            --accent-cyan: #06b6d4;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --card-bg: rgba(20, 20, 20, 0.6);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Dynamic Background Orbs */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(120px);
+            z-index: -1;
+            opacity: 0.4;
+            animation: float 20s infinite alternate ease-in-out;
+        }
+
+        .orb-1 {
+            width: 40vw;
+            height: 40vw;
+            background: var(--accent-glow);
+            top: -10vw;
+            left: -10vw;
+        }
+
+        .orb-2 {
+            width: 35vw;
+            height: 35vw;
+            background: var(--accent-purple);
+            bottom: -5vw;
+            right: -10vw;
+            animation-delay: -5s;
+        }
+
+        .orb-3 {
+            width: 30vw;
+            height: 30vw;
+            background: var(--accent-cyan);
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation-delay: -10s;
+            opacity: 0.2;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(5vw, 5vw) scale(1.1); }
+            100% { transform: translate(-5vw, 10vw) scale(0.9); }
+        }
+
+        /* Header */
+        header {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            padding: 1.5rem 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            background: rgba(5, 5, 5, 0.5);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-link {
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            padding: 0.6rem 1.2rem;
+            border-radius: 99px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-link::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transform: translateX(-100%);
+            transition: 0.5s;
+        }
+
+        .nav-link:hover::before {
+            transform: translateX(100%);
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        /* Main Content */
+        main {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 8rem 5% 4rem;
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 6rem 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            animation: slideUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(40px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(139, 92, 246, 0.1);
+            color: #c4b5fd;
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 99px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-bottom: 2rem;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.1);
+        }
+
+        .hero h1 {
+            font-size: clamp(3rem, 6vw, 5.5rem);
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -2px;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(to right bottom, #ffffff, #a1a1aa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            max-width: 900px;
+        }
+
+        .hero p {
+            font-size: clamp(1.1rem, 2vw, 1.3rem);
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin-bottom: 3rem;
+            line-height: 1.8;
+        }
+
+        .cta-group {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.8rem 2rem;
+            border-radius: 99px;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: #fff;
+            color: #000;
+            box-shadow: 0 0 20px rgba(255,255,255,0.2);
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(255,255,255,0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: rgba(255,255,255,0.2);
+        }
+
+        /* Features Grid */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2rem;
+            margin: 4rem 0 8rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 1.5rem;
+            padding: 2.5rem;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        .card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 40px rgba(59, 130, 246, 0.1);
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+            color: #fff;
+        }
+
+        .card h3 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: #fff;
+        }
+
+        .card p {
+            color: var(--text-secondary);
+            font-size: 1.05rem;
+            line-height: 1.6;
+        }
+
+        /* Architecture Section */
+        .architecture {
+            text-align: center;
+            padding: 6rem 0;
+            border-top: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        .architecture h2 {
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 800;
+            margin-bottom: 1rem;
+            background: linear-gradient(to right, #fff, #9ca3af);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .architecture > p {
+            color: var(--text-secondary);
+            margin-bottom: 4rem;
+            font-size: 1.1rem;
+        }
+
+        .tech-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: center;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .tech-pill {
+            padding: 0.8rem 1.5rem;
+            border-radius: 99px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            font-weight: 500;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .tech-pill:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .tech-pill::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-glow);
+        }
+
+        .tech-pill:nth-child(2n)::before { background: var(--accent-purple); }
+        .tech-pill:nth-child(3n)::before { background: var(--accent-cyan); }
+
+        /* Workflow Steps */
+        .workflow {
+            margin: 6rem 0;
+        }
+        
+        .workflow-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .workflow-header h2 {
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 800;
+            margin-bottom: 1rem;
+        }
+
+        .steps {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .steps::before {
+            content: '';
+            position: absolute;
+            left: 2rem;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(to bottom, var(--accent-glow), var(--accent-purple), transparent);
+            border-radius: 2px;
+            opacity: 0.3;
+        }
+
+        .step {
+            display: flex;
+            gap: 2rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            padding: 2rem;
+            border-radius: 1.5rem;
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease;
+        }
+
+        .step:hover {
+            transform: translateX(10px);
+            border-color: rgba(255,255,255,0.15);
+        }
+
+        .step-number {
+            width: 3rem;
+            height: 3rem;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #fff;
+            flex-shrink: 0;
+            z-index: 1;
+        }
+
+        .step-content h4 {
+            font-size: 1.3rem;
+            margin-bottom: 0.5rem;
+            color: #fff;
+        }
+
+        .step-content p {
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* Footer */
+        footer {
+            padding: 4rem 5%;
+            text-align: center;
+            border-top: 1px solid var(--border-color);
+            background: rgba(0,0,0,0.2);
+            color: var(--text-secondary);
+        }
+
+        .footer-content {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .steps::before { left: 1.5rem; }
+            .step { padding: 1.5rem; gap: 1rem; flex-direction: column; }
+            .step-number { width: 2.5rem; height: 2.5rem; font-size: 1rem; margin-bottom: 0.5rem; }
+            .hero { padding: 4rem 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <header>
+        <div class="logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+            Second Brain
+        </div>
+        <a href="#features" class="nav-link">Explore Features</a>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="badge">
+                <span style="display: inline-block; width: 6px; height: 6px; background: #c4b5fd; border-radius: 50%;"></span>
+                Version 0.0.0
+            </div>
+            <h1>The AI-Powered <br> Knowledge Hub</h1>
+            <p>Capture links, images, and text. Let AI automatically extract summaries, structure notes, and link related concepts. Build a repository of knowledge that actually works for you.</p>
+            <div class="cta-group">
+                <a href="#architecture" class="btn btn-primary">View Architecture</a>
+                <a href="#workflow" class="btn btn-secondary">See How It Works</a>
+            </div>
+        </section>
+
+        <section id="features" class="features">
+            <div class="card" style="transition-delay: 0.1s;">
+                <div class="card-icon">🧠</div>
+                <h3>Intelligent Capture</h3>
+                <p>Save URLs, upload images, or paste raw text. The AI processes pending items, transcribing content and structuring it automatically.</p>
+            </div>
+            <div class="card" style="transition-delay: 0.2s;">
+                <div class="card-icon">✨</div>
+                <h3>AI Synthesis</h3>
+                <p>Generate step-by-step guides, complex workflows, and detailed roadmaps from your saved knowledge base. Items are automatically linked by shared tags.</p>
+            </div>
+            <div class="card" style="transition-delay: 0.3s;">
+                <div class="card-icon">🔍</div>
+                <h3>Semantic Search</h3>
+                <p>Go beyond keywords. Our debounced semantic search finds relevant concepts using AI, seamlessly filtering by status, type, or custom color tags.</p>
+            </div>
+            <div class="card" style="transition-delay: 0.4s;">
+                <div class="card-icon">📦</div>
+                <h3>Markdown Export</h3>
+                <p>Own your data entirely. Instantly export individual notes, generated guides, or AI-structured summaries directly into clean Markdown files.</p>
+            </div>
+            <div class="card" style="transition-delay: 0.5s;">
+                <div class="card-icon">🎨</div>
+                <h3>Modern Dashboard</h3>
+                <p>Visualize your knowledge growth with real-time stats, type breakdown charts, and a responsive grid layout built with shadcn/ui and Tailwind CSS.</p>
+            </div>
+            <div class="card" style="transition-delay: 0.6s;">
+                <div class="card-icon">⚡</div>
+                <h3>Robust API</h3>
+                <p>A fully documented OpenAPI Express server powered by Drizzle ORM and PostgreSQL ensures safe, fast, and reliable data synchronization.</p>
+            </div>
+        </section>
+
+        <section id="workflow" class="workflow">
+            <div class="workflow-header">
+                <h2>The Processing Pipeline</h2>
+                <p style="color: var(--text-secondary); font-size: 1.1rem;">How raw data becomes structured knowledge.</p>
+            </div>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>Capture & Store</h4>
+                        <p>User creates a new knowledge item (link, text, or image upload). The frontend sends it to the API and stores it in PostgreSQL with a <code>pending</code> status.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>Trigger Processing</h4>
+                        <p>The React frontend automatically triggers a background process endpoint <code>/items/:id/process</code> seamlessly using TanStack Query hooks.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>AI Execution</h4>
+                        <p>The Express backend interfaces with the OpenAI integration to extract a summary, structured markdown notes, and an array of key concepts.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <h4>Ready for Use</h4>
+                        <p>The item status is updated to <code>ready</code>. Users can perform semantic searches, view related items, and generate actionable step-by-step guides.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="architecture" class="architecture">
+            <h2>Monorepo Architecture</h2>
+            <p>Built with modern web technologies, organized efficiently.</p>
+            <div class="tech-grid">
+                <div class="tech-pill">React + Vite</div>
+                <div class="tech-pill">Wouter</div>
+                <div class="tech-pill">TanStack Query</div>
+                <div class="tech-pill">shadcn/ui</div>
+                <div class="tech-pill">Tailwind CSS</div>
+                <div class="tech-pill">Express 5</div>
+                <div class="tech-pill">Drizzle ORM</div>
+                <div class="tech-pill">PostgreSQL</div>
+                <div class="tech-pill">OpenAI API</div>
+                <div class="tech-pill">OpenAPI Spec</div>
+                <div class="tech-pill">Orval Codegen</div>
+                <div class="tech-pill">Zod Schemas</div>
+                <div class="tech-pill">TypeScript</div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <div style="font-weight: 600; font-size: 1.2rem; color: #fff;">Second Brain</div>
+            <p>AI-Powered Personal Knowledge Management</p>
+            <p style="font-size: 0.85rem; opacity: 0.7;">License: MIT &bull; Workspace Monorepo</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            document.querySelectorAll('.card').forEach(card => {
+                observer.observe(card);
+            });
+        });
+    </script>
+</body>
+</html>
