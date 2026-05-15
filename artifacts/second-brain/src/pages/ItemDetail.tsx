@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useParams, useLocation } from "wouter";
 import {
   useGetItem,
@@ -14,6 +14,8 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/Layout";
+import { PersonalNotes } from "@/components/PersonalNotes";
+import { ExportPDFButton } from "@/components/ExportPDFButton";
 import { ItemCard } from "@/components/ItemCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,68 +43,16 @@ import {
   Map,
   CheckCircle,
   Clock,
+  ListChecks,
+  GraduationCap,
+  Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import ReactMarkdown from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
-type Block =
-  | { type: "h1" | "h2" | "h3" | "hr" | "blank" | "p"; text: string; key: number }
-  | { type: "ul"; items: string[]; key: number };
 
-function MarkdownNotes({ content }: { content: string }) {
-  const lines = content.split("\n");
-
-  // Group consecutive list lines into a single ul block
-  const blocks: Block[] = [];
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
-    if (line.startsWith("- ") || line.startsWith("* ")) {
-      const items: string[] = [];
-      while (i < lines.length && (lines[i].startsWith("- ") || lines[i].startsWith("* "))) {
-        items.push(lines[i].slice(2));
-        i++;
-      }
-      blocks.push({ type: "ul", items, key: i });
-    } else {
-      if (line.startsWith("# ")) blocks.push({ type: "h1", text: line.slice(2), key: i });
-      else if (line.startsWith("## ")) blocks.push({ type: "h2", text: line.slice(3), key: i });
-      else if (line.startsWith("### ")) blocks.push({ type: "h3", text: line.slice(4), key: i });
-      else if (line.startsWith("---")) blocks.push({ type: "hr", text: "", key: i });
-      else if (line.trim() === "") blocks.push({ type: "blank", text: "", key: i });
-      else blocks.push({ type: "p", text: line, key: i });
-      i++;
-    }
-  }
-
-  return (
-    <div className="prose-notes">
-      {blocks.map((block) => {
-        if (block.type === "h1") return <h1 key={block.key}>{block.text}</h1>;
-        if (block.type === "h2") return <h2 key={block.key}>{block.text}</h2>;
-        if (block.type === "h3") return <h3 key={block.key}>{block.text}</h3>;
-        if (block.type === "hr") return <hr key={block.key} />;
-        if (block.type === "blank") return <div key={block.key} className="h-2" />;
-        if (block.type === "ul") {
-          return (
-            <ul key={block.key}>
-              {block.items.map((item, j) => (
-                <li key={j} dangerouslySetInnerHTML={{ __html: formatInline(item) }} />
-              ))}
-            </ul>
-          );
-        }
-        return <p key={block.key} dangerouslySetInnerHTML={{ __html: formatInline(block.text) }} />;
-      })}
-    </div>
-  );
-}
-
-function formatInline(text: string) {
-  return text
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="text-primary underline">$1</a>');
-}
 
 type GuideType = "steps" | "workflow" | "roadmap";
 
@@ -200,12 +150,12 @@ export function ItemDetail() {
     );
   };
 
-  const sourceTypeIcons = { link: Link2, image: Image, text: FileText };
+  const sourceTypeIcons = { link: Link2, image: Image, text: FileText, transcript: FileText };
 
   if (isLoading) {
     return (
       <Layout>
-        <div className="p-8 max-w-4xl mx-auto">
+        <div className="p-4 md:p-8 max-w-4xl mx-auto">
           <Skeleton className="h-8 w-48 mb-6" />
           <Skeleton className="h-64 w-full rounded-xl" />
         </div>
@@ -230,7 +180,7 @@ export function ItemDetail() {
 
   return (
     <Layout>
-      <div className="p-8 max-w-4xl mx-auto">
+      <div className="p-4 md:p-8 max-w-4xl mx-auto">
         {/* Back */}
         <button
           data-testid="button-back"
@@ -241,7 +191,7 @@ export function ItemDetail() {
         </button>
 
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2">
               <SourceIcon className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -259,17 +209,22 @@ export function ItemDetail() {
                 href={item.sourceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs text-primary hover:underline mt-2 w-fit"
+                className="flex items-center gap-1.5 text-xs text-primary hover:underline mt-2 w-fit break-all"
                 data-testid="link-source-url"
               >
-                <ExternalLink className="w-3 h-3" />
-                {item.sourceUrl.length > 60 ? item.sourceUrl.slice(0, 60) + "..." : item.sourceUrl}
+                <ExternalLink className="w-3 h-3 shrink-0" />
+                <span className="line-clamp-1">{item.sourceUrl}</span>
               </a>
             )}
           </div>
 
-          {/* Status — single expression so React never uses comment anchors */}
           <div className="flex items-center gap-2">
+            {item.difficultyLevel && (
+              <span className="flex items-center gap-1 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                <GraduationCap className="w-3 h-3" />
+                {item.difficultyLevel}
+              </span>
+            )}
             {item.status === "ready" ? (
               <span className="flex items-center gap-1 text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-1 rounded-full font-medium">
                 <CheckCircle className="w-3 h-3" />
@@ -328,6 +283,7 @@ export function ItemDetail() {
             {exportItem.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
             Export
           </Button>
+          <ExportPDFButton item={item} />
           <Button
             variant="outline"
             size="sm"
@@ -343,35 +299,128 @@ export function ItemDetail() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Image */}
-            {item.imageUrl && (
-              <div className="bg-card border border-card-border rounded-xl overflow-hidden">
-                <img src={item.imageUrl} alt={item.title} className="w-full object-contain max-h-80" />
-              </div>
-            )}
+          <div className="lg:col-span-2 space-y-8">
+            {/* Personal Notes Section */}
+            <PersonalNotes itemId={item.id} sourceType={item.sourceType} />
 
-            {/* Summary */}
-            {item.summary && (
-              <div className="bg-card border border-card-border rounded-xl p-5">
-                <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-primary" />
-                  AI Summary
-                </h2>
-                <p className="text-sm text-muted-foreground leading-relaxed">{item.summary}</p>
+            {/* AI Notes / Analysis Section */}
+            <div className="space-y-6 pt-6 border-t border-border/40">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">AI Analysis</h2>
               </div>
-            )}
 
-            {/* Structured Notes */}
-            {item.structuredNotes && (
-              <div className="bg-card border border-card-border rounded-xl p-5">
-                <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-primary" />
-                  Structured Notes
-                </h2>
-                <MarkdownNotes content={item.structuredNotes} />
-              </div>
-            )}
+              {/* Summary */}
+              {item.summary && (
+                <div className="bg-primary/4 border border-primary/10 rounded-xl p-5">
+                  <h3 className="text-xs font-bold text-primary uppercase tracking-tight mb-2">Summary</h3>
+                  <p className="text-sm text-foreground leading-relaxed italic">
+                    "{item.summary}"
+                  </p>
+                </div>
+              )}
+
+              {/* Key Points */}
+              {item.keyPoints && item.keyPoints.length > 0 && (
+                <div className="bg-card border border-card-border rounded-xl p-5">
+                  <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                    <ListChecks className="w-4 h-4 text-primary/60" />
+                    Key Takeaways
+                  </h3>
+                  <ul className="space-y-2">
+                    {item.keyPoints.map((point, idx) => (
+                      <li key={idx} className="flex gap-3 text-sm text-muted-foreground leading-relaxed">
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary/30 mt-1.5 shrink-0" />
+                        {point}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Step-by-Step Instructions */}
+              {item.stepByStep && item.stepByStep.length > 0 && (
+                <div className="bg-card border border-card-border rounded-xl p-5">
+                  <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <GitBranch className="w-4 h-4 text-primary/60" />
+                    Implementation Steps
+                  </h3>
+                  <div className="space-y-4">
+                    {item.stepByStep.map((step, idx) => (
+                      <div key={idx} className="flex gap-4">
+                        <div className="w-6 h-6 rounded-lg bg-primary/10 text-primary text-xs flex items-center justify-center shrink-0 font-bold">
+                          {idx + 1}
+                        </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{step}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Structured Notes */}
+              {item.structuredNotes && (
+                <div className="bg-card border border-card-border rounded-xl p-5">
+                  <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-primary/60" />
+                    Technical Synthesis
+                  </h3>
+                  <div className="prose-notes">
+                    <ReactMarkdown
+                      components={{
+                        p({ children, ...props }) {
+                          return <div className="mb-4 text-sm text-muted-foreground leading-relaxed" {...props}>{children}</div>;
+                        },
+                        pre({ children }: { children?: ReactNode }) {
+                          return <>{children}</>;
+                        },
+                        code({ node, inline, className, children, ...props }: any) {
+                          const match = /language-(\w+)/.exec(className || '');
+                          const text = String(children).replace(/\n$/, '');
+                          if (!inline && match) {
+                            return (
+                              <SyntaxHighlighter
+                                style={vscDarkPlus as any}
+                                language={match[1]}
+                                PreTag="div"
+                                {...props}
+                                customStyle={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  fontSize: '14px',
+                                  lineHeight: '1.6',
+                                  padding: '16px 20px',
+                                  margin: '12px 0',
+                                  boxSizing: 'border-box',
+                                }}
+                              >
+                                {text}
+                              </SyntaxHighlighter>
+                            );
+                          }
+                          if (!inline) {
+                            return (
+                              <pre>
+                                <code className={className} {...props}>
+                                  {children}
+                                </code>
+                              </pre>
+                            );
+                          }
+                          return (
+                            <code className={className} {...props}>
+                              {children}
+                            </code>
+                          );
+                        },
+                      }}
+                    >
+                      {item.structuredNotes}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Raw content */}
             {item.rawContent && !item.structuredNotes && (
@@ -391,30 +440,35 @@ export function ItemDetail() {
                 </div>
                 <p className="text-sm font-medium text-foreground mb-1">Not yet analyzed</p>
                 <p className="text-xs text-muted-foreground mb-4">
-                  Click "Re-process" to let AI extract insights from this item.
+                  {item.sourceType === "image" 
+                    ? "Analysis failed or was interrupted. Please re-capture the image."
+                    : "Click \"Analyze Now\" to let AI extract insights from this item."}
                 </p>
-                <Button size="sm" onClick={handleReprocess} disabled={processItem.isPending} className="gap-2">
-                  {processItem.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="w-4 h-4" />
-                  )}
-                  <span>Analyze Now</span>
-                </Button>
+                {!(item.sourceType === "image" && !item.rawContent) && (
+                  <Button size="sm" onClick={handleReprocess} disabled={processItem.isPending} className="gap-2">
+                    {processItem.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4" />
+                    )}
+                    <span>Analyze Now</span>
+                  </Button>
+                )}
               </div>
             )}
           </div>
 
+
           {/* Sidebar */}
           <div className="space-y-4">
-            {/* Key Concepts */}
-            {item.keyConcepts.length > 0 && (
+            {/* Main Concepts */}
+            {((item.mainConcepts && item.mainConcepts.length > 0) || (item.keyConcepts && item.keyConcepts.length > 0)) && (
               <div className="bg-card border border-card-border rounded-xl p-4">
                 <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide mb-3">
-                  Key Concepts
+                  Concepts
                 </h3>
                 <div className="flex flex-wrap gap-1.5">
-                  {item.keyConcepts.map((concept) => (
+                  {((item.mainConcepts && item.mainConcepts.length > 0) ? item.mainConcepts : item.keyConcepts).map((concept) => (
                     <span
                       key={concept}
                       className="text-xs bg-primary/8 text-primary px-2 py-0.5 rounded-md font-medium"

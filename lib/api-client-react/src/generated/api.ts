@@ -18,18 +18,22 @@ import type {
 
 import type {
   CreateItemBody,
+  CreateNoteBody,
   CreateTagBody,
   ErrorResponse,
   ExportResult,
   GenerateGuideBody,
   GeneratedGuide,
+  GraphData,
   HealthStatus,
   ItemStats,
   KnowledgeItem,
   ListItemsParams,
+  PersonalNote,
   SemanticSearchParams,
   Tag,
   UpdateItemBody,
+  UpdateNoteBody,
   UploadFileBody,
   UploadResult,
 } from "./api.schemas";
@@ -1207,6 +1211,510 @@ export const useCreateTag = <
 > => {
   return useMutation(getCreateTagMutationOptions(options));
 };
+
+/**
+ * @summary List personal notes for a knowledge item
+ */
+export const getListItemNotesUrl = (id: number) => {
+  return `/api/items/${id}/notes`;
+};
+
+export const listItemNotes = async (
+  id: number,
+  options?: RequestInit,
+): Promise<PersonalNote[]> => {
+  return customFetch<PersonalNote[]>(getListItemNotesUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListItemNotesQueryKey = (id: number) => {
+  return [`/api/items/${id}/notes`] as const;
+};
+
+export const getListItemNotesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listItemNotes>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listItemNotes>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListItemNotesQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listItemNotes>>> = ({
+    signal,
+  }) => listItemNotes(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listItemNotes>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListItemNotesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listItemNotes>>
+>;
+export type ListItemNotesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List personal notes for a knowledge item
+ */
+
+export function useListItemNotes<
+  TData = Awaited<ReturnType<typeof listItemNotes>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listItemNotes>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListItemNotesQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a new personal note for an item
+ */
+export const getCreateNoteUrl = (id: number) => {
+  return `/api/items/${id}/notes`;
+};
+
+export const createNote = async (
+  id: number,
+  createNoteBody: CreateNoteBody,
+  options?: RequestInit,
+): Promise<PersonalNote> => {
+  return customFetch<PersonalNote>(getCreateNoteUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createNoteBody),
+  });
+};
+
+export const getCreateNoteMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createNote>>,
+    TError,
+    { id: number; data: BodyType<CreateNoteBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createNote>>,
+  TError,
+  { id: number; data: BodyType<CreateNoteBody> },
+  TContext
+> => {
+  const mutationKey = ["createNote"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createNote>>,
+    { id: number; data: BodyType<CreateNoteBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return createNote(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateNoteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createNote>>
+>;
+export type CreateNoteMutationBody = BodyType<CreateNoteBody>;
+export type CreateNoteMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a new personal note for an item
+ */
+export const useCreateNote = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createNote>>,
+    TError,
+    { id: number; data: BodyType<CreateNoteBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createNote>>,
+  TError,
+  { id: number; data: BodyType<CreateNoteBody> },
+  TContext
+> => {
+  return useMutation(getCreateNoteMutationOptions(options));
+};
+
+/**
+ * @summary Update a personal note
+ */
+export const getUpdateNoteUrl = (id: number) => {
+  return `/api/notes/${id}`;
+};
+
+export const updateNote = async (
+  id: number,
+  updateNoteBody: UpdateNoteBody,
+  options?: RequestInit,
+): Promise<PersonalNote> => {
+  return customFetch<PersonalNote>(getUpdateNoteUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateNoteBody),
+  });
+};
+
+export const getUpdateNoteMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateNote>>,
+    TError,
+    { id: number; data: BodyType<UpdateNoteBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateNote>>,
+  TError,
+  { id: number; data: BodyType<UpdateNoteBody> },
+  TContext
+> => {
+  const mutationKey = ["updateNote"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateNote>>,
+    { id: number; data: BodyType<UpdateNoteBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateNote(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateNoteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateNote>>
+>;
+export type UpdateNoteMutationBody = BodyType<UpdateNoteBody>;
+export type UpdateNoteMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update a personal note
+ */
+export const useUpdateNote = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateNote>>,
+    TError,
+    { id: number; data: BodyType<UpdateNoteBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateNote>>,
+  TError,
+  { id: number; data: BodyType<UpdateNoteBody> },
+  TContext
+> => {
+  return useMutation(getUpdateNoteMutationOptions(options));
+};
+
+/**
+ * @summary Delete a personal note
+ */
+export const getDeleteNoteUrl = (id: number) => {
+  return `/api/notes/${id}`;
+};
+
+export const deleteNote = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteNoteUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteNoteMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteNote>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteNote>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteNote"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteNote>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteNote(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteNoteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteNote>>
+>;
+
+export type DeleteNoteMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a personal note
+ */
+export const useDeleteNote = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteNote>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteNote>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteNoteMutationOptions(options));
+};
+
+/**
+ * @summary AI-enhance a personal note
+ */
+export const getEnhanceNoteUrl = (id: number) => {
+  return `/api/notes/${id}/enhance`;
+};
+
+export const enhanceNote = async (
+  id: number,
+  options?: RequestInit,
+): Promise<PersonalNote> => {
+  return customFetch<PersonalNote>(getEnhanceNoteUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getEnhanceNoteMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof enhanceNote>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof enhanceNote>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["enhanceNote"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof enhanceNote>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return enhanceNote(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type EnhanceNoteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof enhanceNote>>
+>;
+
+export type EnhanceNoteMutationError = ErrorType<unknown>;
+
+/**
+ * @summary AI-enhance a personal note
+ */
+export const useEnhanceNote = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof enhanceNote>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof enhanceNote>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getEnhanceNoteMutationOptions(options));
+};
+
+/**
+ * @summary Get knowledge items formatted for graph visualization
+ */
+export const getGetGraphDataUrl = () => {
+  return `/api/graph/data`;
+};
+
+export const getGraphData = async (
+  options?: RequestInit,
+): Promise<GraphData> => {
+  return customFetch<GraphData>(getGetGraphDataUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetGraphDataQueryKey = () => {
+  return [`/api/graph/data`] as const;
+};
+
+export const getGetGraphDataQueryOptions = <
+  TData = Awaited<ReturnType<typeof getGraphData>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getGraphData>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetGraphDataQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getGraphData>>> = ({
+    signal,
+  }) => getGraphData({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getGraphData>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetGraphDataQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getGraphData>>
+>;
+export type GetGraphDataQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get knowledge items formatted for graph visualization
+ */
+
+export function useGetGraphData<
+  TData = Awaited<ReturnType<typeof getGraphData>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getGraphData>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetGraphDataQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Upload an image or file for processing

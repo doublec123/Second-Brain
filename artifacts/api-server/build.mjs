@@ -100,6 +100,8 @@ async function buildAll() {
       "puppeteer",
       "puppeteer-core",
       "electron",
+      "express-session",
+      "zod",
     ],
     sourcemap: "linked",
     plugins: [

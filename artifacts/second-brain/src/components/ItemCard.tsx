@@ -1,13 +1,16 @@
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Link2, Image, FileText, Clock, CheckCircle, Loader2 } from "lucide-react";
+import { Link2, Image, FileText, Clock, CheckCircle, Loader2, Star, Sparkles } from "lucide-react";
+import { useUpdateItem, getListItemsQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { KnowledgeItem } from "@workspace/api-client-react";
 
-const sourceTypeConfig = {
+const sourceTypeConfig: Record<string, { icon: any; label: string; color: string }> = {
   link: { icon: Link2, label: "Link", color: "text-blue-500" },
   image: { icon: Image, label: "Image", color: "text-emerald-500" },
   text: { icon: FileText, label: "Text", color: "text-violet-500" },
+  transcript: { icon: FileText, label: "Transcript", color: "text-amber-500" },
 };
 
 const statusConfig = {
@@ -26,6 +29,20 @@ export function ItemCard({ item, className }: ItemCardProps) {
   const SourceIcon = sourceConfig.icon;
   const statusCfg = statusConfig[item.status] ?? statusConfig.pending;
   const StatusIcon = statusCfg.icon;
+  const qc = useQueryClient();
+  const updateItem = useUpdateItem({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getListItemsQueryKey() });
+      }
+    }
+  });
+
+  const toggleFavorite = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    updateItem.mutate({ id: item.id, data: { isFavorite: !item.isFavorite } });
+  };
 
   return (
     <Link
@@ -44,10 +61,27 @@ export function ItemCard({ item, className }: ItemCardProps) {
               {item.title}
             </h3>
           </div>
-          <span className={cn("flex items-center gap-1 text-xs px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 font-medium", statusCfg.className)}>
-            <StatusIcon className={cn("w-3 h-3", item.status === "processing" && "animate-spin")} />
-            {statusCfg.label}
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            <button 
+              onClick={toggleFavorite}
+              className={cn(
+                "p-1 rounded-md transition-colors",
+                item.isFavorite ? "text-amber-500 bg-amber-500/10" : "text-muted-foreground hover:bg-muted"
+              )}
+            >
+              <Star className={cn("w-3.5 h-3.5", item.isFavorite && "fill-current")} />
+            </button>
+            <span className={cn("flex items-center gap-1 text-xs px-2 py-0.5 rounded-full whitespace-nowrap font-medium", statusCfg.className)}>
+              <StatusIcon className={cn("w-3 h-3", item.status === "processing" && "animate-spin")} />
+              {statusCfg.label}
+            </span>
+            {item.customInstructions && (
+              <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-bold uppercase tracking-tighter">
+                <Sparkles className="w-2.5 h-2.5" />
+                Guided
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Summary */}
@@ -57,19 +91,14 @@ export function ItemCard({ item, className }: ItemCardProps) {
           </p>
         )}
 
-        {/* Image */}
-        {item.imageUrl && item.sourceType === "image" && (
-          <div className="mb-3 rounded-lg overflow-hidden bg-muted h-28">
-            <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
-          </div>
-        )}
+
 
         {/* Key Concepts */}
         {item.keyConcepts.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-3">
-            {item.keyConcepts.slice(0, 4).map((concept) => (
+            {item.keyConcepts.slice(0, 4).map((concept, idx) => (
               <span
-                key={concept}
+                key={`${concept}-${idx}`}
                 className="text-xs bg-primary/8 text-primary px-2 py-0.5 rounded-md font-medium"
               >
                 {concept}
@@ -84,8 +113,8 @@ export function ItemCard({ item, className }: ItemCardProps) {
         {/* Tags + Date */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex flex-wrap gap-1">
-            {item.tags.slice(0, 3).map((tag) => (
-              <Badge key={tag} variant="secondary" className="text-xs py-0 px-1.5 h-5">
+            {item.tags.slice(0, 3).map((tag, idx) => (
+              <Badge key={`${tag}-${idx}`} variant="secondary" className="text-xs py-0 px-1.5 h-5">
                 {tag}
               </Badge>
             ))}

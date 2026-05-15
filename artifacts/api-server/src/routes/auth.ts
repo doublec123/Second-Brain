@@ -1,0 +1,124 @@
+import { Router } from "express";
+import { db, usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import { logger } from "../lib/logger";
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret";
+
+const router = Router();
+
+router.post("/login", async (req, res): Promise<void> => {
+  const { email, password } = req.body ?? {};
+
+  if (!email || !password) {
+    res.status(400).json({ error: "Email and password are required" });
+    return;
+  }
+
+  try {
+    // Hardcoded Admin check — auto-creates account if missing
+    if (email === "2pack25rap@gmail.com" && password === "123vive$$") {
+      let [user] = await db.select().from(usersTable).where(eq(usersTable.email, email));
+      if (!user) {
+        [user] = await db
+          .insert(usersTable)
+          .values({ email, password, name: "Admin", role: "admin" })
+          .returning();
+      } else if (user.role !== "admin") {
+        // Ensure the role is correct even if account was created as user
+        [user] = await db
+          .update(usersTable)
+          .set({ role: "admin" })
+          .where(eq(usersTable.id, user.id))
+          .returning();
+      }
+
+      (req.session as any).userId = user.id;
+      (req.session as any).userRole = user.role;
+      const token = jwt.sign({ userId: user.id, userRole: user.role }, JWT_SECRET, { expiresIn: '7d' });
+      const { password: _pwd, ...safeUser } = user;
+      res.json({ ...safeUser, token });
+      return;
+    }
+
+    // Normal user login
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email));
+    if (!user || user.password !== password) {
+      res.status(401).json({ error: "Invalid email or password" });
+      return;
+    }
+
+    (req.session as any).userId = user.id;
+    (req.session as any).userRole = user.role;
+    const token = jwt.sign({ userId: user.id, userRole: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    const { password: _pwd, ...safeUser } = user;
+    res.json({ ...safeUser, token });
+  } catch (err) {
+    logger.error({ err }, "Login error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/signup", async (req, res): Promise<void> => {
+  const { email, password, name } = req.body ?? {};
+
+  if (!email || !password) {
+    res.status(400).json({ error: "Email and password are required" });
+    return;
+  }
+  if (password.length < 6) {
+    res.status(400).json({ error: "Password must be at least 6 characters" });
+    return;
+  }
+
+  try {
+    const [existing] = await db.select().from(usersTable).where(eq(usersTable.email, email));
+    if (existing) {
+      res.status(400).json({ error: "An account with that email already exists" });
+      return;
+    }
+
+    const [user] = await db
+      .insert(usersTable)
+      .values({
+        email,
+        password,
+        name: name || email.split("@")[0],
+        role: "user",
+      })
+      .returning();
+
+    (req.session as any).userId = user.id;
+    (req.session as any).userRole = user.role;
+    const token = jwt.sign({ userId: user.id, userRole: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    const { password: _pwd, ...safeUser } = user;
+    res.status(201).json({ ...safeUser, token });
+  } catch (err) {
+    logger.error({ err }, "Signup error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/logout", (req, res): void => {
+  req.session.destroy((err) => {
+    if (err) {
+      res.status(500).json({ error: "Could not log out" });
+      return;
+    }
+    res.clearCookie("connect.sid");
+    res.json({ success: true });
+  });
+});
+
+router.get("/me", async (req, res): Promise<void> => {
+  const user = (req as any).user;
+  if (!user) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+
+  res.json(user);
+});
+
+export default router;

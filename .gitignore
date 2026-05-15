@@ -40,6 +40,7 @@ testem.log
 # System Files
 .DS_Store
 Thumbs.db
+uploads/
 
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
@@ -47,3 +48,9 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Environment Variables
+.env
+.env.local
+.env.production
+.env*.local

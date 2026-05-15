@@ -44,9 +44,9 @@ export function Dashboard() {
 
   return (
     <Layout>
-      <div className="p-8 max-w-6xl mx-auto">
+      <div className="p-4 md:p-8 max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:items-center sm:flex-row justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-bold text-foreground tracking-tight">Knowledge Dashboard</h1>
             <p className="text-sm text-muted-foreground mt-1">
@@ -55,7 +55,7 @@ export function Dashboard() {
           </div>
           <Button
             data-testid="button-capture-new"
-            className="gap-2"
+            className="gap-2 w-full sm:w-auto"
             onClick={() => setLocation("/capture")}
           >
             <Plus className="w-4 h-4" />

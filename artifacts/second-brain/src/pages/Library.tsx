@@ -60,7 +60,7 @@ export function Library() {
 
   return (
     <Layout>
-      <div className="p-8 max-w-6xl mx-auto">
+      <div className="p-4 md:p-8 max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
@@ -90,44 +90,50 @@ export function Library() {
         {/* Filters */}
         <div className="flex flex-wrap gap-4 mb-6">
           {/* Type filter */}
-          <div className="flex items-center gap-1.5">
-            <Filter className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-            <span className="text-xs text-muted-foreground mr-1">Type:</span>
-            {typeButtons.map(({ value, label }) => (
-              <button
-                key={value}
-                data-testid={`filter-type-${value}`}
-                onClick={() => setFilterType(value)}
-                className={cn(
-                  "text-xs px-2.5 py-1 rounded-md font-medium transition-colors",
-                  filterType === value
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                )}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex items-center gap-1.5 mr-2">
+              <Filter className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              <span className="text-xs text-muted-foreground">Type:</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {typeButtons.map(({ value, label }) => (
+                <button
+                  key={value}
+                  data-testid={`filter-type-${value}`}
+                  onClick={() => setFilterType(value)}
+                  className={cn(
+                    "text-xs px-2.5 py-1 rounded-md font-medium transition-colors",
+                    filterType === value
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Status filter */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground mr-1">Status:</span>
-            {statusButtons.map(({ value, label }) => (
-              <button
-                key={value}
-                data-testid={`filter-status-${value}`}
-                onClick={() => setFilterStatus(value)}
-                className={cn(
-                  "text-xs px-2.5 py-1 rounded-md font-medium transition-colors",
-                  filterStatus === value
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                )}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted-foreground mr-2">Status:</span>
+            <div className="flex flex-wrap gap-1.5">
+              {statusButtons.map(({ value, label }) => (
+                <button
+                  key={value}
+                  data-testid={`filter-status-${value}`}
+                  onClick={() => setFilterStatus(value)}
+                  className={cn(
+                    "text-xs px-2.5 py-1 rounded-md font-medium transition-colors",
+                    filterStatus === value
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {hasFilters && (
@@ -143,9 +149,9 @@ export function Library() {
         {/* Tag pills */}
         {tags && tags.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-6">
-            {tags.map((tag) => (
+            {tags.map((tag, idx) => (
               <button
-                key={tag.id}
+                key={`${tag.id}-${tag.name}-${idx}`}
                 data-testid={`tag-filter-${tag.name}`}
                 onClick={() => setFilterTag(filterTag === tag.name ? "" : tag.name)}
                 className={cn(
@@ -175,8 +181,8 @@ export function Library() {
           </div>
         ) : items && items.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map((item) => (
-              <ItemCard key={item.id} item={item} />
+            {items.map((item, idx) => (
+              <ItemCard key={`${item.id}-${idx}`} item={item} />
             ))}
           </div>
         ) : (

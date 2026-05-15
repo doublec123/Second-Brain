@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, sql, desc, or } from "drizzle-orm";
-import { db, knowledgeItemsTable, tagsTable } from "@workspace/db";
+import { eq, ilike, sql, desc, or, and } from "drizzle-orm";
+import { db, knowledgeItemsTable, tagsTable, knowledgeItemCategoriesTable, categoriesTable } from "@workspace/db";
 import {
   ListItemsQueryParams,
   CreateItemBody,
@@ -17,13 +17,80 @@ import {
 } from "@workspace/api-zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { logger } from "../lib/logger";
+import { fetchYouTubeTranscript, isYouTubeUrl } from "../lib/youtube";
+import { authenticate } from "../middlewares/auth";
 import fs from "fs";
 import path from "path";
 
+const getSystemPrompt = (sourceType: string, categoryNames: string, customInstructions?: string) => {
+  let prompt = `You are a professional knowledge extraction and technical synthesis AI. Your goal is to transform the provided content from a ${sourceType} source into high-quality, structured notes.
+
+Core Rules:
+1. **Knowledge Extraction**: Identify the main topic, key points, and critical takeaways.
+2. **Code & Technical Content**: If the content includes ANY code, commands, terminal instructions, syntax examples, or config snippets, you MUST reproduce them EXACTLY as they appeared. Wrap them in triple backticks with the correct language tag (e.g., \`\`\`python, \`\`\`bash). Do NOT paraphrase or summarize code.
+3. **Explanations**: For every code block included, provide a short, clear one-line explanation above it.
+4. **Formatting**: Your "structuredNotes" field MUST follow this specific structure:
+   - ## Main Topic
+   - [Short overview of the content]
+   - ## Key Points
+   - [Bullet points of main ideas]
+   - ## Code Examples (ONLY if code/commands exist)
+   - [One-line explanation followed by code block]
+   - ## Summary
+   - [Concise closing summary]
+
+Principles:
+- Extract all meaningful technical examples; do not skip any.
+- Simplify complex explanations without losing technical accuracy.
+- Ensure the notes are evergreen and easy to reference months later.
+
+Respond ONLY with valid JSON in this exact format:
+{
+  "summary": "Concise 2-4 sentence summary of the core message",
+  "structuredNotes": "## Main Topic\\n... [Follow the structure above] ...",
+  "keyPoints": ["point1", "point2"],
+  "mainConcepts": ["concept1", "concept2"],
+  "stepByStep": ["step1", "step2"],
+  "difficultyLevel": "Beginner/Intermediate/Advanced",
+  "keyConcepts": ["tag1", "tag2"],
+  "suggestedCategories": ["category1", "category2"]
+}
+
+Categories available: [${categoryNames}]`;
+
+  if (customInstructions && customInstructions.trim()) {
+    prompt += `\n\nTHE USER HAS PROVIDED THE FOLLOWING CUSTOM INSTRUCTIONS - FOLLOW THEM CAREFULLY:\n"${customInstructions}"`;
+  }
+
+  return prompt;
+};
+
+function extractJson(text: string) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    const match = text.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
+    if (match && match[1]) {
+      try {
+        return JSON.parse(match[1].trim());
+      } catch { /* ignore */ }
+    }
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start !== -1 && end !== -1 && end > start) {
+      try {
+        return JSON.parse(text.substring(start, end + 1));
+      } catch { /* ignore */ }
+    }
+    throw new Error("Could not parse JSON from AI response");
+  }
+}
+
 const router: IRouter = Router();
 
-router.get("/items/stats", async (_req, res): Promise<void> => {
-  const items = await db.select().from(knowledgeItemsTable);
+router.get("/items/stats", authenticate, async (req, res): Promise<void> => {
+  const userId = (req.session as any).userId;
+  const items = await db.select().from(knowledgeItemsTable).where(eq(knowledgeItemsTable.userId, userId));
 
   const byType = { link: 0, image: 0, text: 0 };
   const byStatus = { pending: 0, processing: 0, ready: 0 };
@@ -41,7 +108,8 @@ router.get("/items/stats", async (_req, res): Promise<void> => {
   res.json({ total: items.length, byType, byStatus, recentCount });
 });
 
-router.get("/items/search", async (req, res): Promise<void> => {
+router.get("/items/search", authenticate, async (req, res): Promise<void> => {
+  const userId = (req.session as any).userId;
   const parsed = SemanticSearchQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -52,7 +120,7 @@ router.get("/items/search", async (req, res): Promise<void> => {
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5-mini",
+      model: process.env.OPENAI_MODEL_SEARCH || "openai/gpt-4o-mini",
       max_completion_tokens: 500,
       messages: [
         {
@@ -75,6 +143,7 @@ router.get("/items/search", async (req, res): Promise<void> => {
     const allItems = await db
       .select()
       .from(knowledgeItemsTable)
+      .where(eq(knowledgeItemsTable.userId, userId))
       .orderBy(desc(knowledgeItemsTable.createdAt));
 
     const scored = allItems
@@ -97,9 +166,12 @@ router.get("/items/search", async (req, res): Promise<void> => {
       .select()
       .from(knowledgeItemsTable)
       .where(
-        or(
-          ilike(knowledgeItemsTable.title, `%${q}%`),
-          ilike(knowledgeItemsTable.summary ?? sql`''`, `%${q}%`)
+        and(
+          eq(knowledgeItemsTable.userId, userId),
+          or(
+            ilike(knowledgeItemsTable.title, `%${q}%`),
+            ilike(knowledgeItemsTable.summary ?? sql`''`, `%${q}%`)
+          )
         )
       )
       .limit(20);
@@ -107,19 +179,39 @@ router.get("/items/search", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/items", async (req, res): Promise<void> => {
+router.get("/items", authenticate, async (req, res): Promise<void> => {
+  const userId = (req.session as any).userId;
   const parsed = ListItemsQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
 
-  const { q, type, tag, status } = parsed.data;
+  const parsedData = parsed.data as any;
+  const { q, type, tag, status, isFavorite, groupId, categoryId } = parsedData;
 
-  let items = await db
-    .select()
-    .from(knowledgeItemsTable)
-    .orderBy(desc(knowledgeItemsTable.createdAt));
+  const baseQuery = db
+    .selectDistinct({
+      item: knowledgeItemsTable,
+    })
+    .from(knowledgeItemsTable);
+
+  const finalQuery = categoryId
+    ? baseQuery
+        .innerJoin(
+          knowledgeItemCategoriesTable,
+          eq(knowledgeItemsTable.id, knowledgeItemCategoriesTable.itemId)
+        )
+        .where(
+          and(
+            eq(knowledgeItemsTable.userId, userId),
+            eq(knowledgeItemCategoriesTable.categoryId, categoryId)
+          )
+        )
+    : baseQuery.where(eq(knowledgeItemsTable.userId, userId));
+
+  const itemsWithMeta = await finalQuery.orderBy(desc(knowledgeItemsTable.createdAt));
+  let items = itemsWithMeta.map(r => r.item);
 
   if (q) {
     const lower = q.toLowerCase();
@@ -135,35 +227,163 @@ router.get("/items", async (req, res): Promise<void> => {
   if (type) items = items.filter((item) => item.sourceType === type);
   if (tag) items = items.filter((item) => item.tags.includes(tag));
   if (status) items = items.filter((item) => item.status === status);
+  if (isFavorite !== undefined) items = items.filter((item) => item.isFavorite === isFavorite);
+  if (groupId) items = items.filter((item) => item.groupId === groupId);
+
+  // Attach categories to items
+  const itemIds = items.map(i => i.id);
+  if (itemIds.length > 0) {
+    const allItemCategories = await db
+      .select({
+        itemId: knowledgeItemCategoriesTable.itemId,
+        categoryName: categoriesTable.name,
+      })
+      .from(knowledgeItemCategoriesTable)
+      .innerJoin(categoriesTable, eq(knowledgeItemCategoriesTable.categoryId, categoriesTable.id))
+      .where(sql`${knowledgeItemCategoriesTable.itemId} IN ${itemIds}`);
+
+    items = items.map(item => ({
+      ...item,
+      categories: allItemCategories
+        .filter(c => c.itemId === item.id)
+        .map(c => c.categoryName)
+    }));
+  } else {
+    items = items.map(item => ({ ...item, categories: [] }));
+  }
 
   res.json(items);
 });
 
-router.post("/items", async (req, res): Promise<void> => {
+router.post("/items", authenticate, async (req, res): Promise<void> => {
+  const userId = (req.session as any).userId;
   const parsed = CreateItemBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
 
+  let title = parsed.data.title;
+  let rawContent = parsed.data.rawContent ?? null;
+  let sourceType = parsed.data.sourceType;
+  let customInstructions = (parsed.data as any).customInstructions ?? null;
+
+  if (
+    (sourceType === "link" || (sourceType as any) === "transcript") &&
+    parsed.data.sourceUrl &&
+    isYouTubeUrl(parsed.data.sourceUrl)
+  ) {
+    const apiKey = process.env.YOUTUBE_TRANSCRIPT_API_KEY;
+    if (!apiKey || apiKey === "your_transcript_api_key_here") {
+      logger.error("YOUTUBE_TRANSCRIPT_API_KEY is missing or placeholder");
+      res.status(400).json({ error: "YouTube transcript feature requires a valid Transcript API key. Please update YOUTUBE_TRANSCRIPT_API_KEY in your .env file." });
+      return;
+    }
+
+    try {
+      const ytData = await fetchYouTubeTranscript(parsed.data.sourceUrl, apiKey);
+      rawContent = ytData.transcript;
+      if (!title || title.toLowerCase() === "new link" || title.toLowerCase() === "untitled") {
+        title = ytData.title || title;
+      }
+      sourceType = "transcript" as any;
+    } catch (err: any) {
+      logger.error({ err, url: parsed.data.sourceUrl }, "YouTube transcript fetch failed");
+      res.status(err.message === "This video has no available transcript." ? 404 : 400).json({ error: err.message });
+      return;
+    }
+  }
+
+  const categories = await db.select().from(categoriesTable).where(eq(categoriesTable.userId, userId));
+  const categoryNames = categories.map(c => c.name).join(", ");
+  
+  let parsedNotes: any = {};
+  let finalStatus = "pending";
+
+  if (sourceType === "image" && rawContent) {
+    const base64 = rawContent;
+    const systemPrompt = getSystemPrompt(sourceType, categoryNames, customInstructions);
+    try {
+        const response = await openai.chat.completions.create({
+          model: process.env.OPENAI_MODEL_VISION || "openai/gpt-4o",
+          max_completion_tokens: 4096,
+          messages: [
+            { role: "system", content: systemPrompt },
+            {
+              role: "user",
+              content: [
+                { type: "text" as const, text: `Title: ${title}\nAnalyze this image thoroughly and extract all visible text, data, concepts, and meaningful information.` },
+                { type: "image_url" as const, image_url: { url: `data:image/jpeg;base64,${base64}`, detail: "high" as const } },
+              ],
+            },
+          ],
+        });
+        const content = response.choices[0]?.message?.content ?? "{}";
+        try {
+          parsedNotes = extractJson(content);
+          finalStatus = "ready";
+        } catch (err) {
+          logger.error({ err, content }, "Failed to parse AI response for image");
+          res.status(500).json({ error: "AI analysis failed to generate valid structured data. Please try again." });
+          return;
+        }
+    } catch (err) {
+        logger.error({ err }, "Image AI processing failed");
+        res.status(500).json({ error: "AI processing failed" });
+        return;
+    }
+  }
+
   const [item] = await db
     .insert(knowledgeItemsTable)
     .values({
-      title: parsed.data.title,
+      userId,
+      title,
       sourceUrl: parsed.data.sourceUrl ?? null,
-      sourceType: parsed.data.sourceType,
-      rawContent: parsed.data.rawContent ?? null,
-      imageUrl: parsed.data.imageUrl ?? null,
+      sourceType: sourceType as any,
+      rawContent: sourceType === "image" ? null : rawContent,
       tags: parsed.data.tags ?? [],
-      status: "pending",
-      keyConcepts: [],
+      groupId: (parsed.data as any).groupId ?? null,
+      status: finalStatus,
+      summary: parsedNotes.summary ?? null,
+      structuredNotes: parsedNotes.structuredNotes ?? null,
+      keyPoints: parsedNotes.keyPoints ?? [],
+      stepByStep: parsedNotes.stepByStep ?? [],
+      mainConcepts: parsedNotes.mainConcepts ?? [],
+      difficultyLevel: parsedNotes.difficultyLevel ?? null,
+      keyConcepts: parsedNotes.keyConcepts ?? [],
+      customInstructions: customInstructions,
     })
     .returning();
+
+  if ((parsed.data as any).categoryIds && (parsed.data as any).categoryIds.length > 0) {
+    await db.insert(knowledgeItemCategoriesTable).values(
+      (parsed.data as any).categoryIds.map((catId: number) => ({
+        itemId: item.id,
+        categoryId: catId
+      }))
+    );
+  }
+
+  if (parsedNotes.suggestedCategories && parsedNotes.suggestedCategories.length > 0) {
+    for (const catName of parsedNotes.suggestedCategories) {
+      let cat = categories.find(c => c.name.toLowerCase() === catName.toLowerCase());
+      if (!cat) {
+        [cat] = await db.insert(categoriesTable).values({ name: catName, userId }).returning();
+      }
+      if (cat) {
+        await db.insert(knowledgeItemCategoriesTable)
+          .values({ itemId: item.id, categoryId: cat.id })
+          .onConflictDoNothing();
+      }
+    }
+  }
 
   res.status(201).json(item);
 });
 
-router.get("/items/:id", async (req, res): Promise<void> => {
+router.get("/items/:id", authenticate, async (req, res): Promise<void> => {
+  const userId = (req.session as any).userId;
   const params = GetItemParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -173,7 +393,7 @@ router.get("/items/:id", async (req, res): Promise<void> => {
   const [item] = await db
     .select()
     .from(knowledgeItemsTable)
-    .where(eq(knowledgeItemsTable.id, params.data.id));
+    .where(and(eq(knowledgeItemsTable.id, params.data.id), eq(knowledgeItemsTable.userId, userId)));
 
   if (!item) {
     res.status(404).json({ error: "Item not found" });
@@ -183,7 +403,8 @@ router.get("/items/:id", async (req, res): Promise<void> => {
   res.json(item);
 });
 
-router.patch("/items/:id", async (req, res): Promise<void> => {
+router.patch("/items/:id", authenticate, async (req, res): Promise<void> => {
+  const userId = (req.session as any).userId;
   const params = UpdateItemParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -202,11 +423,14 @@ router.patch("/items/:id", async (req, res): Promise<void> => {
   if (parsed.data.summary !== undefined) updateData.summary = parsed.data.summary;
   if (parsed.data.structuredNotes !== undefined)
     updateData.structuredNotes = parsed.data.structuredNotes;
+  if ((parsed.data as any).isFavorite !== undefined) updateData.isFavorite = (parsed.data as any).isFavorite;
+  if ((parsed.data as any).groupId !== undefined) updateData.groupId = (parsed.data as any).groupId;
+  if ((parsed.data as any).customInstructions !== undefined) updateData.customInstructions = (parsed.data as any).customInstructions;
 
   const [item] = await db
     .update(knowledgeItemsTable)
     .set(updateData)
-    .where(eq(knowledgeItemsTable.id, params.data.id))
+    .where(and(eq(knowledgeItemsTable.id, params.data.id), eq(knowledgeItemsTable.userId, userId)))
     .returning();
 
   if (!item) {
@@ -217,7 +441,8 @@ router.patch("/items/:id", async (req, res): Promise<void> => {
   res.json(item);
 });
 
-router.delete("/items/:id", async (req, res): Promise<void> => {
+router.delete("/items/:id", authenticate, async (req, res): Promise<void> => {
+  const userId = (req.session as any).userId;
   const params = DeleteItemParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -226,7 +451,7 @@ router.delete("/items/:id", async (req, res): Promise<void> => {
 
   const [item] = await db
     .delete(knowledgeItemsTable)
-    .where(eq(knowledgeItemsTable.id, params.data.id))
+    .where(and(eq(knowledgeItemsTable.id, params.data.id), eq(knowledgeItemsTable.userId, userId)))
     .returning();
 
   if (!item) {
@@ -237,7 +462,8 @@ router.delete("/items/:id", async (req, res): Promise<void> => {
   res.sendStatus(204);
 });
 
-router.post("/items/:id/process", async (req, res): Promise<void> => {
+router.post("/items/:id/process", authenticate, async (req, res): Promise<void> => {
+  const userId = (req.session as any).userId;
   const params = ProcessItemParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -247,7 +473,7 @@ router.post("/items/:id/process", async (req, res): Promise<void> => {
   const [item] = await db
     .select()
     .from(knowledgeItemsTable)
-    .where(eq(knowledgeItemsTable.id, params.data.id));
+    .where(and(eq(knowledgeItemsTable.id, params.data.id), eq(knowledgeItemsTable.userId, userId)));
 
   if (!item) {
     res.status(404).json({ error: "Item not found" });
@@ -259,87 +485,54 @@ router.post("/items/:id/process", async (req, res): Promise<void> => {
     .set({ status: "processing" })
     .where(eq(knowledgeItemsTable.id, item.id));
 
-  const systemPrompt = `You are a knowledge extraction AI. Given content from a ${item.sourceType} source, you must:
-1. Write a concise summary (2-4 sentences)
-2. Create structured notes in Markdown format with clear headings, bullet points, and bold key terms
-3. Extract 5-10 key concepts as short phrases
+  const categories = await db.select().from(categoriesTable).where(eq(categoriesTable.userId, userId));
+  const categoryNames = categories.map(c => c.name).join(", ");
 
-Respond ONLY with valid JSON in this exact format:
-{
-  "summary": "...",
-  "structuredNotes": "# Title\\n\\n## Key Points\\n- ...",
-  "keyConcepts": ["concept1", "concept2"]
-}`;
+  if (item.sourceType === "image" && !item.rawContent) {
+    res.status(400).json({ error: "Image data was not saved. Please re-capture the image to re-analyze." });
+    return;
+  }
+
+  const systemPrompt = getSystemPrompt(item.sourceType, categoryNames, item.customInstructions ?? undefined);
 
   try {
     let response;
 
-    if (item.sourceType === "image" && item.imageUrl) {
-      // For images: read file from disk and send to vision model
-      const filename = path.basename(item.imageUrl);
-      const filePath = path.join(process.cwd(), "uploads", filename);
-
-      if (fs.existsSync(filePath)) {
-        const fileBuffer = fs.readFileSync(filePath);
-        const base64 = fileBuffer.toString("base64");
-        const ext = path.extname(filename).slice(1).toLowerCase();
-        const mimeType =
-          ext === "jpg" || ext === "jpeg" ? "image/jpeg" :
-          ext === "png" ? "image/png" :
-          ext === "gif" ? "image/gif" :
-          ext === "webp" ? "image/webp" : "image/jpeg";
-
-        response = await openai.chat.completions.create({
-          model: "gpt-4o",
-          max_completion_tokens: 4096,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          messages: [
-            { role: "system", content: systemPrompt },
-            {
-              role: "user",
-              content: [
-                { type: "text" as const, text: `Title: ${item.title}\nAnalyze this image thoroughly and extract all visible text, data, concepts, and meaningful information.` },
-                { type: "image_url" as const, image_url: { url: `data:${mimeType};base64,${base64}`, detail: "high" as const } },
-              ],
-            },
-          ],
-        });
-      } else {
-        // Image file missing — fall back to text model with title only
-        response = await openai.chat.completions.create({
-          model: "gpt-5.4",
-          max_completion_tokens: 2048,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: `Title: ${item.title}\nSource type: image\n(Image file not accessible)` },
-          ],
-        });
-      }
-    } else {
-      const contentToProcess = item.rawContent ?? item.sourceUrl ?? item.title;
-      response = await openai.chat.completions.create({
-        model: "gpt-5.4",
-        max_completion_tokens: 4096,
-        messages: [
-          { role: "system", content: systemPrompt },
-          {
-            role: "user",
-            content: `Title: ${item.title}\nSource type: ${item.sourceType}\nContent: ${contentToProcess?.substring(0, 8000) ?? "(no content)"}`,
-          },
-        ],
-      });
-    }
+    const contentToProcess = item.rawContent ?? item.sourceUrl ?? item.title;
+    response = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL_CHAT || "openai/gpt-4o-mini",
+      max_completion_tokens: 4096,
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: `Title: ${item.title}\nSource type: ${item.sourceType}\nContent: ${contentToProcess?.substring(0, 8000) ?? "(no content)"}`,
+        },
+      ],
+    });
 
     const content = response.choices[0]?.message?.content ?? "{}";
-    let parsed: {
-      summary?: string;
-      structuredNotes?: string;
-      keyConcepts?: string[];
-    } = {};
+    let parsed: any = {};
     try {
-      parsed = JSON.parse(content);
-    } catch {
-      logger.warn({ content }, "Failed to parse AI response");
+      parsed = extractJson(content);
+    } catch (err) {
+      logger.error({ err, content }, "Failed to parse AI response during reprocessing");
+      res.status(500).json({ error: "Failed to parse AI response" });
+      return;
+    }
+
+    if (parsed.suggestedCategories && parsed.suggestedCategories.length > 0) {
+      for (const catName of parsed.suggestedCategories) {
+        let cat = categories.find(c => c.name.toLowerCase() === catName.toLowerCase());
+        if (!cat) {
+          [cat] = await db.insert(categoriesTable).values({ name: catName, userId }).returning();
+        }
+        if (cat) {
+          await db.insert(knowledgeItemCategoriesTable)
+            .values({ itemId: item.id, categoryId: cat.id })
+            .onConflictDoNothing();
+        }
+      }
     }
 
     const [updated] = await db
@@ -347,6 +540,10 @@ Respond ONLY with valid JSON in this exact format:
       .set({
         summary: parsed.summary ?? null,
         structuredNotes: parsed.structuredNotes ?? null,
+        keyPoints: parsed.keyPoints ?? [],
+        stepByStep: parsed.stepByStep ?? [],
+        mainConcepts: parsed.mainConcepts ?? [],
+        difficultyLevel: parsed.difficultyLevel ?? null,
         keyConcepts: parsed.keyConcepts ?? [],
         status: "ready",
       })
@@ -364,7 +561,8 @@ Respond ONLY with valid JSON in this exact format:
   }
 });
 
-router.post("/items/:id/generate-guide", async (req, res): Promise<void> => {
+router.post("/items/:id/generate-guide", authenticate, async (req, res): Promise<void> => {
+  const userId = (req.session as any).userId;
   const params = GenerateGuideParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -380,7 +578,7 @@ router.post("/items/:id/generate-guide", async (req, res): Promise<void> => {
   const [item] = await db
     .select()
     .from(knowledgeItemsTable)
-    .where(eq(knowledgeItemsTable.id, params.data.id));
+    .where(and(eq(knowledgeItemsTable.id, params.data.id), eq(knowledgeItemsTable.userId, userId)));
 
   if (!item) {
     res.status(404).json({ error: "Item not found" });
@@ -393,11 +591,10 @@ router.post("/items/:id/generate-guide", async (req, res): Promise<void> => {
     roadmap: "a learning roadmap with milestones",
   };
 
-  const guideDesc =
-    guideTypeDescriptions[parsed.data.guideType] ?? "a guide";
+  const guideDesc = guideTypeDescriptions[parsed.data.guideType] ?? "a guide";
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5.4",
+    model: process.env.OPENAI_MODEL_CHAT || "openai/gpt-4o-mini",
     max_completion_tokens: 4096,
     messages: [
       {
@@ -419,17 +616,14 @@ Respond ONLY with valid JSON in this exact format:
 Summary: ${item.summary ?? ""}
 Structured Notes: ${item.structuredNotes ?? ""}
 Key Concepts: ${item.keyConcepts.join(", ")}
+Custom Instructions: ${item.customInstructions ?? "None"}
 Guide Type: ${parsed.data.guideType}`,
       },
     ],
   });
 
   const content = response.choices[0]?.message?.content ?? "{}";
-  let guideData: {
-    title?: string;
-    content?: string;
-    steps?: Array<{ stepNumber: number; title: string; description: string }>;
-  } = {};
+  let guideData: any = {};
 
   try {
     guideData = JSON.parse(content);
@@ -449,7 +643,8 @@ Guide Type: ${parsed.data.guideType}`,
   });
 });
 
-router.get("/items/:id/related", async (req, res): Promise<void> => {
+router.get("/items/:id/related", authenticate, async (req, res): Promise<void> => {
+  const userId = (req.session as any).userId;
   const params = GetRelatedItemsParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -459,7 +654,7 @@ router.get("/items/:id/related", async (req, res): Promise<void> => {
   const [item] = await db
     .select()
     .from(knowledgeItemsTable)
-    .where(eq(knowledgeItemsTable.id, params.data.id));
+    .where(and(eq(knowledgeItemsTable.id, params.data.id), eq(knowledgeItemsTable.userId, userId)));
 
   if (!item) {
     res.json([]);
@@ -469,7 +664,7 @@ router.get("/items/:id/related", async (req, res): Promise<void> => {
   const allItems = await db
     .select()
     .from(knowledgeItemsTable)
-    .where(sql`${knowledgeItemsTable.id} != ${params.data.id}`)
+    .where(and(sql`${knowledgeItemsTable.id} != ${params.data.id}`, eq(knowledgeItemsTable.userId, userId)))
     .orderBy(desc(knowledgeItemsTable.createdAt));
 
   const related = allItems
@@ -488,7 +683,8 @@ router.get("/items/:id/related", async (req, res): Promise<void> => {
   res.json(related);
 });
 
-router.post("/items/:id/export", async (req, res): Promise<void> => {
+router.post("/items/:id/export", authenticate, async (req, res): Promise<void> => {
+  const userId = (req.session as any).userId;
   const params = ExportItemParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -498,7 +694,7 @@ router.post("/items/:id/export", async (req, res): Promise<void> => {
   const [item] = await db
     .select()
     .from(knowledgeItemsTable)
-    .where(eq(knowledgeItemsTable.id, params.data.id));
+    .where(and(eq(knowledgeItemsTable.id, params.data.id), eq(knowledgeItemsTable.userId, userId)));
 
   if (!item) {
     res.status(404).json({ error: "Item not found" });
@@ -546,3 +742,4 @@ ${item.tags.join(", ") || "_No tags_"}
 });
 
 export default router;
+;

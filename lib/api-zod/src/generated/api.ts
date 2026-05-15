@@ -36,6 +36,13 @@ export const ListItemsResponseItem = zod.object({
   tags: zod.array(zod.string()),
   status: zod.enum(["pending", "processing", "ready"]),
   imageUrl: zod.string().nullish(),
+  customInstructions: zod.string().nullish(),
+  isFavorite: zod.boolean(),
+  groupId: zod.number().nullish(),
+  keyPoints: zod.array(zod.string()),
+  stepByStep: zod.array(zod.string()),
+  mainConcepts: zod.array(zod.string()),
+  difficultyLevel: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -49,8 +56,11 @@ export const CreateItemBody = zod.object({
   sourceUrl: zod.string().optional(),
   sourceType: zod.enum(["link", "image", "text"]),
   rawContent: zod.string().optional(),
+  customInstructions: zod.string().optional(),
   imageUrl: zod.string().optional(),
   tags: zod.array(zod.string()).optional(),
+  groupId: zod.number().optional(),
+  categoryIds: zod.array(zod.number()).optional(),
 });
 
 /**
@@ -90,6 +100,13 @@ export const SemanticSearchResponseItem = zod.object({
   tags: zod.array(zod.string()),
   status: zod.enum(["pending", "processing", "ready"]),
   imageUrl: zod.string().nullish(),
+  customInstructions: zod.string().nullish(),
+  isFavorite: zod.boolean(),
+  groupId: zod.number().nullish(),
+  keyPoints: zod.array(zod.string()),
+  stepByStep: zod.array(zod.string()),
+  mainConcepts: zod.array(zod.string()),
+  difficultyLevel: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -114,6 +131,13 @@ export const GetItemResponse = zod.object({
   tags: zod.array(zod.string()),
   status: zod.enum(["pending", "processing", "ready"]),
   imageUrl: zod.string().nullish(),
+  customInstructions: zod.string().nullish(),
+  isFavorite: zod.boolean(),
+  groupId: zod.number().nullish(),
+  keyPoints: zod.array(zod.string()),
+  stepByStep: zod.array(zod.string()),
+  mainConcepts: zod.array(zod.string()),
+  difficultyLevel: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -130,6 +154,8 @@ export const UpdateItemBody = zod.object({
   tags: zod.array(zod.string()).optional(),
   summary: zod.string().optional(),
   structuredNotes: zod.string().optional(),
+  isFavorite: zod.boolean().optional(),
+  groupId: zod.number().optional(),
 });
 
 export const UpdateItemResponse = zod.object({
@@ -144,6 +170,13 @@ export const UpdateItemResponse = zod.object({
   tags: zod.array(zod.string()),
   status: zod.enum(["pending", "processing", "ready"]),
   imageUrl: zod.string().nullish(),
+  customInstructions: zod.string().nullish(),
+  isFavorite: zod.boolean(),
+  groupId: zod.number().nullish(),
+  keyPoints: zod.array(zod.string()),
+  stepByStep: zod.array(zod.string()),
+  mainConcepts: zod.array(zod.string()),
+  difficultyLevel: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -174,6 +207,13 @@ export const ProcessItemResponse = zod.object({
   tags: zod.array(zod.string()),
   status: zod.enum(["pending", "processing", "ready"]),
   imageUrl: zod.string().nullish(),
+  customInstructions: zod.string().nullish(),
+  isFavorite: zod.boolean(),
+  groupId: zod.number().nullish(),
+  keyPoints: zod.array(zod.string()),
+  stepByStep: zod.array(zod.string()),
+  mainConcepts: zod.array(zod.string()),
+  difficultyLevel: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -221,6 +261,13 @@ export const GetRelatedItemsResponseItem = zod.object({
   tags: zod.array(zod.string()),
   status: zod.enum(["pending", "processing", "ready"]),
   imageUrl: zod.string().nullish(),
+  customInstructions: zod.string().nullish(),
+  isFavorite: zod.boolean(),
+  groupId: zod.number().nullish(),
+  keyPoints: zod.array(zod.string()),
+  stepByStep: zod.array(zod.string()),
+  mainConcepts: zod.array(zod.string()),
+  difficultyLevel: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -256,6 +303,131 @@ export const ListTagsResponse = zod.array(ListTagsResponseItem);
 export const CreateTagBody = zod.object({
   name: zod.string(),
   color: zod.string(),
+});
+
+/**
+ * @summary List personal notes for a knowledge item
+ */
+export const ListItemNotesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListItemNotesResponseItem = zod.object({
+  id: zod.number(),
+  itemId: zod.number(),
+  type: zod.enum([
+    "general",
+    "takeaway",
+    "action_item",
+    "question",
+    "reflection",
+  ]),
+  format: zod.enum(["plain", "markdown", "bullet"]),
+  target: zod.enum(["item", "link", "image"]),
+  content: zod.string(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListItemNotesResponse = zod.array(ListItemNotesResponseItem);
+
+/**
+ * @summary Create a new personal note for an item
+ */
+export const CreateNoteParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CreateNoteBody = zod.object({
+  type: zod
+    .enum(["general", "takeaway", "action_item", "question", "reflection"])
+    .optional(),
+  format: zod.enum(["plain", "markdown", "bullet"]).optional(),
+  target: zod.enum(["item", "link", "image"]).optional(),
+  content: zod.string(),
+});
+
+/**
+ * @summary Update a personal note
+ */
+export const UpdateNoteParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateNoteBody = zod.object({
+  type: zod
+    .enum(["general", "takeaway", "action_item", "question", "reflection"])
+    .optional(),
+  format: zod.enum(["plain", "markdown", "bullet"]).optional(),
+  target: zod.enum(["item", "link", "image"]).optional(),
+  content: zod.string().optional(),
+});
+
+export const UpdateNoteResponse = zod.object({
+  id: zod.number(),
+  itemId: zod.number(),
+  type: zod.enum([
+    "general",
+    "takeaway",
+    "action_item",
+    "question",
+    "reflection",
+  ]),
+  format: zod.enum(["plain", "markdown", "bullet"]),
+  target: zod.enum(["item", "link", "image"]),
+  content: zod.string(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete a personal note
+ */
+export const DeleteNoteParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary AI-enhance a personal note
+ */
+export const EnhanceNoteParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const EnhanceNoteResponse = zod.object({
+  id: zod.number(),
+  itemId: zod.number(),
+  type: zod.enum([
+    "general",
+    "takeaway",
+    "action_item",
+    "question",
+    "reflection",
+  ]),
+  format: zod.enum(["plain", "markdown", "bullet"]),
+  target: zod.enum(["item", "link", "image"]),
+  content: zod.string(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Get knowledge items formatted for graph visualization
+ */
+export const GetGraphDataResponse = zod.object({
+  nodes: zod.array(
+    zod.object({
+      id: zod.string(),
+      title: zod.string(),
+      type: zod.string(),
+      val: zod.number(),
+    }),
+  ),
+  links: zod.array(
+    zod.object({
+      source: zod.string(),
+      target: zod.string(),
+    }),
+  ),
 });
 
 /**

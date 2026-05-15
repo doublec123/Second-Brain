@@ -1,0 +1,18 @@
+{
+  "name": "@workspace/openai-ai-integrations",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./client/audio": "./src/client/audio/index.ts",
+    "./server/audio": "./src/server/audio/index.ts"
+  },
+  "dependencies": {
+    "react": "catalog:",
+    "openai": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "typescript": "catalog:"
+  }
+}

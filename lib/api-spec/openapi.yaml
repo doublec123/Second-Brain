@@ -16,6 +16,8 @@ tags:
     description: Tag operations
   - name: upload
     description: File upload operations
+  - name: notes
+    description: Personal note operations
 paths:
   /healthz:
     get:
@@ -318,6 +320,120 @@ paths:
               schema:
                 $ref: "#/components/schemas/Tag"
 
+  /items/{id}/notes:
+    get:
+      operationId: listItemNotes
+      tags: [notes]
+      summary: List personal notes for a knowledge item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of personal notes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PersonalNote"
+    post:
+      operationId: createNote
+      tags: [notes]
+      summary: Create a new personal note for an item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNoteBody"
+      responses:
+        "201":
+          description: Created note
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonalNote"
+
+  /notes/{id}:
+    patch:
+      operationId: updateNote
+      tags: [notes]
+      summary: Update a personal note
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNoteBody"
+      responses:
+        "200":
+          description: Updated note
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonalNote"
+    delete:
+      operationId: deleteNote
+      tags: [notes]
+      summary: Delete a personal note
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /notes/{id}/enhance:
+    post:
+      operationId: enhanceNote
+      tags: [notes]
+      summary: AI-enhance a personal note
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Enhanced note
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonalNote"
+
+  /graph/data:
+    get:
+      operationId: getGraphData
+      tags: [items]
+      summary: Get knowledge items formatted for graph visualization
+      responses:
+        "200":
+          description: Graph data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GraphData"
+
   /upload:
     post:
       operationId: uploadFile
@@ -378,6 +494,26 @@ components:
           enum: [pending, processing, ready]
         imageUrl:
           type: ["string", "null"]
+        customInstructions:
+          type: ["string", "null"]
+        isFavorite:
+          type: boolean
+        groupId:
+          type: ["integer", "null"]
+        keyPoints:
+          type: array
+          items:
+            type: string
+        stepByStep:
+          type: array
+          items:
+            type: string
+        mainConcepts:
+          type: array
+          items:
+            type: string
+        difficultyLevel:
+          type: ["string", "null"]
         createdAt:
           type: string
           format: date-time
@@ -391,6 +527,10 @@ components:
         - keyConcepts
         - tags
         - status
+        - isFavorite
+        - keyPoints
+        - stepByStep
+        - mainConcepts
         - createdAt
         - updatedAt
 
@@ -406,12 +546,20 @@ components:
           enum: [link, image, text]
         rawContent:
           type: string
+        customInstructions:
+          type: string
         imageUrl:
           type: string
         tags:
           type: array
           items:
             type: string
+        groupId:
+          type: integer
+        categoryIds:
+          type: array
+          items:
+            type: integer
       required:
         - title
         - sourceType
@@ -429,6 +577,10 @@ components:
           type: string
         structuredNotes:
           type: string
+        isFavorite:
+          type: boolean
+        groupId:
+          type: integer
 
     ItemStats:
       type: object
@@ -583,3 +735,106 @@ components:
           type: string
       required:
         - error
+
+    PersonalNote:
+      type: object
+      properties:
+        id:
+          type: integer
+        itemId:
+          type: integer
+        type:
+          type: string
+          enum: [general, takeaway, action_item, question, reflection]
+        format:
+          type: string
+          enum: [plain, markdown, bullet]
+        target:
+          type: string
+          enum: [item, link, image]
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - itemId
+        - type
+        - format
+        - target
+        - content
+        - createdAt
+        - updatedAt
+
+    CreateNoteBody:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [general, takeaway, action_item, question, reflection]
+        format:
+          type: string
+          enum: [plain, markdown, bullet]
+        target:
+          type: string
+          enum: [item, link, image]
+        content:
+          type: string
+      required:
+        - content
+
+    UpdateNoteBody:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [general, takeaway, action_item, question, reflection]
+        format:
+          type: string
+          enum: [plain, markdown, bullet]
+        target:
+          type: string
+          enum: [item, link, image]
+        content:
+          type: string
+
+    GraphData:
+      type: object
+      properties:
+        nodes:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              title:
+                type: string
+              type:
+                type: string
+              val:
+                type: number
+            required:
+              - id
+              - title
+              - type
+              - val
+        links:
+          type: array
+          items:
+            type: object
+            properties:
+              source:
+                type: string
+              target:
+                type: string
+            required:
+              - source
+              - target
+      required:
+        - nodes
+        - links

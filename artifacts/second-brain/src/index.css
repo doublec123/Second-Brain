@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
@@ -290,6 +290,35 @@
   .prose-notes ul { @apply list-disc pl-5 mb-3 space-y-1 text-muted-foreground; }
   .prose-notes ol { @apply list-decimal pl-5 mb-3 space-y-1 text-muted-foreground; }
   .prose-notes strong { @apply text-foreground font-medium; }
-  .prose-notes code { @apply font-mono text-xs bg-muted px-1.5 py-0.5 rounded text-primary; }
+  .prose-notes pre {
+    background-color: #1e1e1e;
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 12px 0;
+  }
+  .prose-notes pre code {
+    font-family: 'Fira Code', 'Courier New', Consospace, monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #d4d4d4;
+    white-space: pre;
+    display: block;
+    width: 100%;
+    background-color: transparent;
+    padding: 0;
+    border-radius: 0;
+  }
+  /* Inline backticks only; exclude Prism SyntaxHighlighter inner `code.language-*` */
+  .prose-notes code:not(pre code):not([class*='language-']) {
+    background-color: #2d2d2d;
+    color: #ce9178;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: 'Fira Code', 'Courier New', monospace;
+  }
   .prose-notes hr { @apply border-border my-4; }
 }

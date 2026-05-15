@@ -44,6 +44,16 @@ export interface KnowledgeItem {
   status: KnowledgeItemStatus;
   /** @nullable */
   imageUrl?: string | null;
+  /** @nullable */
+  customInstructions?: string | null;
+  isFavorite: boolean;
+  /** @nullable */
+  groupId?: number | null;
+  keyPoints: string[];
+  stepByStep: string[];
+  mainConcepts: string[];
+  /** @nullable */
+  difficultyLevel?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -62,8 +72,11 @@ export interface CreateItemBody {
   sourceUrl?: string;
   sourceType: CreateItemBodySourceType;
   rawContent?: string;
+  customInstructions?: string;
   imageUrl?: string;
   tags?: string[];
+  groupId?: number;
+  categoryIds?: number[];
 }
 
 export interface UpdateItemBody {
@@ -71,6 +84,8 @@ export interface UpdateItemBody {
   tags?: string[];
   summary?: string;
   structuredNotes?: string;
+  isFavorite?: boolean;
+  groupId?: number;
 }
 
 export type ItemStatsByType = {
@@ -152,11 +167,143 @@ export interface ErrorResponse {
   error: string;
 }
 
+export type PersonalNoteType =
+  (typeof PersonalNoteType)[keyof typeof PersonalNoteType];
+
+export const PersonalNoteType = {
+  general: "general",
+  takeaway: "takeaway",
+  action_item: "action_item",
+  question: "question",
+  reflection: "reflection",
+} as const;
+
+export type PersonalNoteFormat =
+  (typeof PersonalNoteFormat)[keyof typeof PersonalNoteFormat];
+
+export const PersonalNoteFormat = {
+  plain: "plain",
+  markdown: "markdown",
+  bullet: "bullet",
+} as const;
+
+export type PersonalNoteTarget =
+  (typeof PersonalNoteTarget)[keyof typeof PersonalNoteTarget];
+
+export const PersonalNoteTarget = {
+  item: "item",
+  link: "link",
+  image: "image",
+} as const;
+
+export interface PersonalNote {
+  id: number;
+  itemId: number;
+  type: PersonalNoteType;
+  format: PersonalNoteFormat;
+  target: PersonalNoteTarget;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreateNoteBodyType =
+  (typeof CreateNoteBodyType)[keyof typeof CreateNoteBodyType];
+
+export const CreateNoteBodyType = {
+  general: "general",
+  takeaway: "takeaway",
+  action_item: "action_item",
+  question: "question",
+  reflection: "reflection",
+} as const;
+
+export type CreateNoteBodyFormat =
+  (typeof CreateNoteBodyFormat)[keyof typeof CreateNoteBodyFormat];
+
+export const CreateNoteBodyFormat = {
+  plain: "plain",
+  markdown: "markdown",
+  bullet: "bullet",
+} as const;
+
+export type CreateNoteBodyTarget =
+  (typeof CreateNoteBodyTarget)[keyof typeof CreateNoteBodyTarget];
+
+export const CreateNoteBodyTarget = {
+  item: "item",
+  link: "link",
+  image: "image",
+} as const;
+
+export interface CreateNoteBody {
+  type?: CreateNoteBodyType;
+  format?: CreateNoteBodyFormat;
+  target?: CreateNoteBodyTarget;
+  content: string;
+}
+
+export type UpdateNoteBodyType =
+  (typeof UpdateNoteBodyType)[keyof typeof UpdateNoteBodyType];
+
+export const UpdateNoteBodyType = {
+  general: "general",
+  takeaway: "takeaway",
+  action_item: "action_item",
+  question: "question",
+  reflection: "reflection",
+} as const;
+
+export type UpdateNoteBodyFormat =
+  (typeof UpdateNoteBodyFormat)[keyof typeof UpdateNoteBodyFormat];
+
+export const UpdateNoteBodyFormat = {
+  plain: "plain",
+  markdown: "markdown",
+  bullet: "bullet",
+} as const;
+
+export type UpdateNoteBodyTarget =
+  (typeof UpdateNoteBodyTarget)[keyof typeof UpdateNoteBodyTarget];
+
+export const UpdateNoteBodyTarget = {
+  item: "item",
+  link: "link",
+  image: "image",
+} as const;
+
+export interface UpdateNoteBody {
+  type?: UpdateNoteBodyType;
+  format?: UpdateNoteBodyFormat;
+  target?: UpdateNoteBodyTarget;
+  content?: string;
+}
+
+export type GraphDataNodesItem = {
+  id: string;
+  title: string;
+  type: string;
+  val: number;
+};
+
+export type GraphDataLinksItem = {
+  source: string;
+  target: string;
+};
+
+export interface GraphData {
+  nodes: GraphDataNodesItem[];
+  links: GraphDataLinksItem[];
+}
+
 export type ListItemsParams = {
   q?: string;
   type?: string;
   tag?: string;
   status?: string;
+  isFavorite?: boolean;
+  groupId?: number;
+  categoryId?: number;
 };
 
 export type SemanticSearchParams = {
