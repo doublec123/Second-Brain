@@ -19,7 +19,7 @@ router.get("/items/:id/notes", authenticate, async (req, res): Promise<void> => 
     .where(and(eq(knowledgeItemsTable.id, itemId), eq(knowledgeItemsTable.userId, userId)));
 
   if (!item) {
-    return res.status(404).json({ error: "Item not found" });
+    return void res.status(404).json({ error: "Item not found" });
   }
 
   const notes = await db
@@ -44,7 +44,7 @@ router.post("/items/:id/notes", authenticate, async (req, res): Promise<void> =>
     .where(and(eq(knowledgeItemsTable.id, itemId), eq(knowledgeItemsTable.userId, userId)));
 
   if (!item) {
-    return res.status(404).json({ error: "Item not found" });
+    return void res.status(404).json({ error: "Item not found" });
   }
 
   const [note] = await db
@@ -78,7 +78,7 @@ router.patch("/notes/:id", authenticate, async (req, res): Promise<void> => {
     .where(and(eq(personalNotesTable.id, noteId), eq(knowledgeItemsTable.userId, userId)));
 
   if (!noteWithUser) {
-    return res.status(404).json({ error: "Note not found" });
+    return void res.status(404).json({ error: "Note not found" });
   }
 
   const [updatedNote] = await db
@@ -106,7 +106,7 @@ router.delete("/notes/:id", authenticate, async (req, res): Promise<void> => {
     .where(and(eq(personalNotesTable.id, noteId), eq(knowledgeItemsTable.userId, userId)));
 
   if (!noteWithUser) {
-    return res.status(404).json({ error: "Note not found" });
+    return void res.status(404).json({ error: "Note not found" });
   }
 
   await db.delete(personalNotesTable).where(eq(personalNotesTable.id, noteId));
@@ -128,7 +128,7 @@ router.post("/notes/:id/enhance", authenticate, async (req, res): Promise<void> 
     .where(and(eq(personalNotesTable.id, noteId), eq(knowledgeItemsTable.userId, userId)));
 
   if (!noteWithUser) {
-    return res.status(404).json({ error: "Note not found" });
+    return void res.status(404).json({ error: "Note not found" });
   }
 
   const { content, type } = noteWithUser.note;
