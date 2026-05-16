@@ -76,7 +76,7 @@ export function requireAuth(
   if (!req.user) {
     return res.status(401).json({ error: "Unauthorized" });
   }
-  next();
+  return next();
 }
 
 export function requireAdmin(
@@ -87,5 +87,5 @@ export function requireAdmin(
   if (!req.user || req.user.role !== "admin") {
     return res.status(403).json({ error: "Forbidden" });
   }
-  next();
+  return next();
 }
