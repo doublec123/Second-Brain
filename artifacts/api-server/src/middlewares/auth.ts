@@ -101,7 +101,7 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
   if (!(req as any).user) {
     return res.status(401).json({ error: "Unauthorized. Please log in." });
   }
-  next();
+  return next();
 };
 
 /** Require admin access */
@@ -110,5 +110,5 @@ export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
   if (!user || user.role !== "admin") {
     return res.status(403).json({ error: "Forbidden. Admin access required." });
   }
-  next();
+  return next();
 };
