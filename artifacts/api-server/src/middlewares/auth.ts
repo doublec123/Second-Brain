@@ -21,6 +21,8 @@ export async function authMiddleware(
   next: NextFunction
 ) {
   const authHeader = req.headers.authorization;
+  console.log('JWT Secret exists:', !!process.env.SUPABASE_JWT_SECRET)
+  console.log('Authorization header:', req.headers.authorization?.substring(0, 20))
   if (!authHeader?.startsWith("Bearer ")) {
     // Check if session has userId (legacy support or if we still want sessions)
     const userId = (req.session as any)?.userId;
