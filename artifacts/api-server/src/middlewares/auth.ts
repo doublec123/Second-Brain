@@ -94,6 +94,16 @@ export async function authMiddleware(
 
   const token = authHeader.split(" ")[1];
 
+  console.log('=== AUTH DEBUG ===');
+  console.log('Authorization header present:', !!req.headers.authorization);
+  console.log('Token prefix:', req.headers.authorization?.substring(0, 30));
+  try {
+    const decoded = jwt.verify(token, SUPABASE_JWT_SECRET);
+    console.log('Token decoded successfully:', !!decoded);
+  } catch (err: any) {
+    console.log('Token verification failed:', err.message);
+  }
+
   try {
     const verified = await verifyToken(token);
 
