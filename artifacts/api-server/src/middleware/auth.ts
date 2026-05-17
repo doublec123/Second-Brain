@@ -1,10 +1,15 @@
 import type { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { logger } from "../lib/logger";
+import { logger } from "../lib/logger.js";
+import jwt from "jsonwebtoken";
+import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET || "";
+const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET || process.env.JWT_SECRET || "";
+const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || "";
+
+const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -13,6 +18,42 @@ export interface AuthenticatedRequest extends Request {
     role: string;
     supabaseId: string;
   };
+}
+
+async function verifyToken(token: string): Promise<{ sub: string; email: string; user_metadata?: any } | null> {
+  // 1. Try Supabase Client API first (handles ES256 and HS256 automatically)
+  if (supabase) {
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser(token);
+      if (user && !error) {
+        return {
+          sub: user.id,
+          email: user.email || "",
+          user_metadata: user.user_metadata
+        };
+      }
+    } catch (e: any) {
+      logger.error({ err: e.message }, "Supabase getUser failed, falling back to local JWT verification");
+    }
+  }
+
+  // 2. Fallback to local jwt.verify (useful for unit tests or fallback environments)
+  if (SUPABASE_JWT_SECRET) {
+    try {
+      const decoded = jwt.verify(token, SUPABASE_JWT_SECRET) as any;
+      if (decoded && decoded.sub) {
+        return {
+          sub: decoded.sub,
+          email: decoded.email || "",
+          user_metadata: decoded.user_metadata
+        };
+      }
+    } catch (e: any) {
+      logger.error({ err: e.message }, "Local JWT verification fallback failed");
+    }
+  }
+
+  return null;
 }
 
 export async function authMiddleware(
@@ -28,9 +69,15 @@ export async function authMiddleware(
   const token = authHeader.split(" ")[1];
 
   try {
-    const payload = jwt.verify(token, SUPABASE_JWT_SECRET) as any;
-    const supabaseId = payload.sub;
-    const email = payload.email;
+    const verified = await verifyToken(token);
+
+    if (!verified || !verified.sub) {
+      logger.error({ tokenPreview: token.substring(0, 20) }, "Invalid Supabase token payload");
+      return next();
+    }
+
+    const supabaseId = verified.sub;
+    const email = verified.email || "";
 
     // Find or create user in our local DB
     let [user] = await db
@@ -40,7 +87,7 @@ export async function authMiddleware(
 
     if (!user) {
       // Auto-provision user if they exist in Supabase but not in our DB
-      const name = payload.user_metadata?.full_name || email.split("@")[0];
+      const name = verified.user_metadata?.full_name || email.split("@")[0];
       [user] = await db
         .insert(usersTable)
         .values({
@@ -62,8 +109,8 @@ export async function authMiddleware(
     };
 
     next();
-  } catch (err) {
-    logger.error({ err }, "JWT verification failed");
+  } catch (err: any) {
+    logger.error({ err: err.message, name: err.name, tokenPreview: token.substring(0, 20) }, "Auth verification failed");
     next();
   }
 }
