@@ -52,20 +52,14 @@ export function Login() {
   // 1. Store the user in the /me cache so AuthGuard sees it immediately
   // 2. Navigate — no race condition
   const handleAuthSuccess = (user: any) => {
-    if (!user) {
-      // Case for signup pending email confirmation
-      toast({ 
-        title: "Check your email", 
-        description: "Signup successful, please check your email for confirmation." 
-      });
-      return; 
-    }
-
     // 1. Wipe any stale data from a previous session immediately
     queryClient.clear();
+
     // 2. Populate the /me query cache with the new logged-in user
-    queryClient.setQueryData(["/api/auth/me"], user);
-    toast({ title: `Welcome${user.name ? `, ${user.name}` : ""}!` });
+    if (user) {
+      queryClient.setQueryData(["/api/auth/me"], user);
+    }
+    toast({ title: `Welcome${user?.name ? `, ${user.name}` : ""}!` });
     // Small tick to let React flush the cache update before routing
     setTimeout(() => setLocation("/library"), 50);
   };
