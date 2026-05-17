@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
+const API_URL = import.meta.env.VITE_API_URL || "";
+
+function resolveUrl(path: string): string {
+  return path.startsWith("/") ? `${API_URL}${path}` : path;
+}
+
 // ---------------------------------------------------------------------------
 // Shared fetch helper — redirects to /login on any 401
 // ---------------------------------------------------------------------------
@@ -13,7 +19,8 @@ async function apiFetch(input: RequestInfo, init?: RequestInit): Promise<Respons
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(input, { ...init, headers });
+  const targetInput = typeof input === "string" ? resolveUrl(input) : input;
+  const response = await fetch(targetInput, { ...init, headers });
   if (response.status === 401) {
     // Hard redirect — clears all in-memory state automatically
     window.location.href = "/login";
@@ -38,7 +45,7 @@ export const useLogin = () => {
       if (error) throw error;
 
       // Sync with our backend to ensure user exists in our DB and get their local profile
-      const response = await fetch("/api/auth/me", {
+      const response = await fetch(resolveUrl("/api/auth/me"), {
         headers: { "Authorization": `Bearer ${authData.session.access_token}` }
       });
       
@@ -70,7 +77,7 @@ export const useSignup = () => {
       }
 
       // Sync with our backend
-      const response = await fetch("/api/auth/me", {
+      const response = await fetch(resolveUrl("/api/auth/me"), {
         headers: { "Authorization": `Bearer ${authData.session.access_token}` }
       });
       
@@ -89,7 +96,7 @@ export const useLogout = () => {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       // Also notify backend to clear session if it's still using it
-      await fetch("/api/auth/logout", { method: "POST" });
+      await fetch(resolveUrl("/api/auth/logout"), { method: "POST" });
     },
   });
 };
@@ -101,7 +108,7 @@ export const useGetMe = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return null;
 
-      const response = await fetch("/api/auth/me", {
+      const response = await fetch(resolveUrl("/api/auth/me"), {
         headers: { "Authorization": `Bearer ${session.access_token}` }
       });
 
