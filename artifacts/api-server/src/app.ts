@@ -43,7 +43,7 @@ app.use(
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (same-origin via proxy) or localhost origins
-    if (!origin || origin.includes("localhost") || origin.includes("127.0.0.1")) {
+    if (!origin || origin.includes("localhost") || origin.includes("127.0.0.1") || origin.includes("vercel.app")) {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
