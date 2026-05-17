@@ -1,3 +1,6 @@
 {
-  "outputDirectory": "artifacts/second-brain/dist/public"
+  "outputDirectory": "artifacts/second-brain/dist/public",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
