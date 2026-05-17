@@ -125,7 +125,18 @@ router.get("/me", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(user);
+  // Safe type-mapping to prevent any UUID vs integer id mismatches
+  const parsedId = typeof user.id === "string" ? parseInt(user.id, 10) : user.id;
+
+  res.json({
+    id: isNaN(parsedId) ? user.id : parsedId,
+    email: user.email,
+    name: user.name || user.email.split("@")[0],
+    role: user.role || "user",
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    supabaseId: user.supabaseId
+  });
 });
 
 export default router;
