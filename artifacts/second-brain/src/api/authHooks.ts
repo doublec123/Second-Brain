@@ -65,13 +65,25 @@ export const useSignup = () => {
       });
 
       if (error) throw error;
-      if (!authData.session) {
-        return null;
+
+      let session = authData.session;
+      if (!session) {
+        // Auto-login fallback: force sign-in immediately to acquire session
+        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
+        });
+        if (loginError) throw loginError;
+        session = loginData.session;
+      }
+
+      if (!session) {
+        throw new Error("Failed to establish active user session");
       }
 
       // Sync with our backend
       const response = await fetch("/api/auth/me", {
-        headers: { "Authorization": `Bearer ${authData.session.access_token}` }
+        headers: { "Authorization": `Bearer ${session.access_token}` }
       });
       
       if (!response.ok) {
