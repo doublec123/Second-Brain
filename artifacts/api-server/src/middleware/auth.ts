@@ -111,6 +111,7 @@ export async function authMiddleware(
     next();
   } catch (err: any) {
     logger.error({ err: err.message, name: err.name, tokenPreview: token.substring(0, 20) }, "Auth verification failed");
+    (req as any).authError = err.message || String(err);
     next();
   }
 }

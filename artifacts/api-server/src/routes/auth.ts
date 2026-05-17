@@ -113,6 +113,13 @@ router.post("/logout", (req, res): void => {
 
 router.get("/me", async (req, res): Promise<void> => {
   const user = (req as any).user;
+  const authError = (req as any).authError;
+
+  if (authError) {
+    res.status(500).json({ error: `Database or authentication error: ${authError}` });
+    return;
+  }
+
   if (!user) {
     res.status(401).json({ error: "Not authenticated" });
     return;
