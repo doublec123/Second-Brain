@@ -118,7 +118,7 @@ export async function authMiddleware(
           email,
           name,
           role: email === "2pack25rap@gmail.com" ? "admin" : "user",
-          password: "", // No local password for Supabase users
+          password: null, // Set to null instead of empty string to avoid CHECK constraints
         })
         .returning();
       
