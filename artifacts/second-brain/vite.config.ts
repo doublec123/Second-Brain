@@ -14,7 +14,7 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 export default defineConfig({
-  base: basePath,
+  base: "/",
   plugins: [
     react(),
     tailwindcss(),
