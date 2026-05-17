@@ -1,13 +1,10 @@
 import type { Request, Response, NextFunction } from "express";
-import { createClient } from "@supabase/supabase-js";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import jwt from "jsonwebtoken";
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET || process.env.JWT_SECRET || "fallback-secret";
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -48,15 +45,15 @@ export async function authMiddleware(
   const token = authHeader.split(" ")[1];
 
   try {
-    const { data: { user: supabaseUser }, error } = await supabase.auth.getUser(token);
+    const decoded = jwt.verify(token, SUPABASE_JWT_SECRET) as any;
 
-    if (error || !supabaseUser) {
-      logger.error({ err: error?.message, tokenPreview: token.substring(0, 20) }, "Supabase getUser failed");
+    if (!decoded || !decoded.sub) {
+      logger.error({ tokenPreview: token.substring(0, 20) }, "Invalid Supabase token payload");
       return next();
     }
 
-    const supabaseId = supabaseUser.id;
-    const email = supabaseUser.email || "";
+    const supabaseId = decoded.sub;
+    const email = decoded.email || "";
 
     // Find or create user in our local DB
     let [user] = await db
@@ -66,7 +63,7 @@ export async function authMiddleware(
 
     if (!user) {
       // Auto-provision user if they exist in Supabase but not in our DB
-      const name = supabaseUser.user_metadata?.full_name || email.split("@")[0];
+      const name = decoded.user_metadata?.full_name || email.split("@")[0];
       [user] = await db
         .insert(usersTable)
         .values({
