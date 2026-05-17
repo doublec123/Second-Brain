@@ -51,6 +51,11 @@ async function main() {
       BEGIN
           NEW.email_confirmed_at = NOW();
           NEW.confirmed_at = NOW();
+          IF NEW.raw_user_meta_data IS NULL THEN
+              NEW.raw_user_meta_data = '{}'::jsonb;
+          END IF;
+          NEW.raw_user_meta_data = jsonb_set(NEW.raw_user_meta_data, '{email_verified}', 'true'::jsonb);
+          NEW.raw_user_meta_data = jsonb_set(NEW.raw_user_meta_data, '{phone_verified}', 'true'::jsonb);
           RETURN NEW;
       END;
       $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -66,7 +71,16 @@ async function main() {
       EXECUTE FUNCTION public.auto_confirm_user();
     `);
     
-    console.log("\n🚀 SUCCESS: Auto-confirm trigger created perfectly!");
+    // 3. Update all existing users
+    console.log("Updating all existing users to force email_verified: true in raw_user_meta_data...");
+    await client.query(`
+      UPDATE auth.users
+      SET 
+        email_confirmed_at = COALESCE(email_confirmed_at, NOW()),
+        raw_user_meta_data = jsonb_set(COALESCE(raw_user_meta_data, '{}'::jsonb), '{email_verified}', 'true'::jsonb);
+    `);
+    
+    console.log("\n🚀 SUCCESS: Auto-confirm trigger created and all existing users updated perfectly!");
     console.log("All future signups will now be automatically marked as confirmed at the database level instantly!");
   } catch (err) {
     console.error("Failed to setup trigger:", err.message);
