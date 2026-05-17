@@ -1,22 +1,10 @@
 {
   "version": 2,
-  "framework": null,
   "installCommand": "corepack enable && corepack prepare pnpm@10.28.0 --activate && pnpm install --no-frozen-lockfile",
   "buildCommand": "pnpm run build",
   "outputDirectory": "artifacts/second-brain/dist/public",
-  "functions": {
-    "artifacts/api-server/src/app.ts": {
-      "runtime": "@vercel/node@3"
-    }
-  },
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "artifacts/api-server/src/app.ts"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+    { "source": "/api/(.*)", "destination": "/artifacts/api-server/src/app.ts" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
