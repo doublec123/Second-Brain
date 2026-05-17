@@ -1,7 +1,26 @@
 {
-  "outputDirectory": "artifacts/second-brain/dist/public",
-  "rewrites": [
-    { "source": "/api/:path*", "destination": "https://second-brain-api-server-doublec123s-projects.vercel.app/api/:path*" },
-    { "source": "/(.*)", "destination": "/index.html" }
+  "version": 2,
+  "builds": [
+    {
+      "src": "artifacts/api-server/src/app.ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "artifacts/second-brain/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "artifacts/second-brain/dist/public"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "artifacts/api-server/src/app.ts"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "artifacts/second-brain/dist/public/$1"
+    }
   ]
 }

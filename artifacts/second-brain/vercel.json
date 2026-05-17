@@ -1,7 +1,0 @@
-{
-  "outputDirectory": "dist/public",
-  "rewrites": [
-    { "source": "/api/:path*", "destination": "https://second-brain-api-server-doublec123s-projects.vercel.app/api/:path*" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}
