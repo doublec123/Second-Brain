@@ -99,7 +99,13 @@ export const useGetMe = () => {
     queryKey: ["/api/auth/me"],
     queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return null;
+      if (!session || !session.access_token) return null;
+
+      // Check if the session is expired
+      const isExpired = session.expires_at ? (session.expires_at * 1000 < Date.now()) : false;
+      if (isExpired) {
+        return null;
+      }
 
       const response = await fetch("/api/auth/me", {
         headers: { "Authorization": `Bearer ${session.access_token}` }

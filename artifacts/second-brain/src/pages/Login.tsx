@@ -93,9 +93,24 @@ export function Login() {
         {
           onSuccess: handleAuthSuccess,
           onError: (err: any) => {
+            let msg = err.message || "Could not create account.";
+            if (
+              msg.toLowerCase().includes("already registered") || 
+              msg.toLowerCase().includes("already exists") || 
+              msg.toLowerCase().includes("taken") ||
+              (err.status === 422 && msg.toLowerCase().includes("email"))
+            ) {
+              msg = "An account with this email address already exists. Please sign in instead!";
+            } else if (
+              msg.toLowerCase().includes("at least 6 characters") || 
+              msg.toLowerCase().includes("too short") ||
+              (err.status === 422 && msg.toLowerCase().includes("password"))
+            ) {
+              msg = "Password is too short. It must be at least 6 characters long.";
+            }
             toast({
               title: "Signup failed",
-              description: err.message || "Could not create account.",
+              description: msg,
               variant: "destructive",
             });
           },
