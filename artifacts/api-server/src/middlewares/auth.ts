@@ -97,6 +97,11 @@ export async function authMiddleware(
   console.log('=== AUTH DEBUG ===');
   console.log('Authorization header present:', !!req.headers.authorization);
   console.log('Token prefix:', req.headers.authorization?.substring(0, 30));
+  console.log('=== ENV DEBUG ===');
+  console.log('SUPABASE_JWT_SECRET exists:', !!SUPABASE_JWT_SECRET);
+  console.log('VITE_SUPABASE_URL exists:', !!supabaseUrl);
+  console.log('VITE_SUPABASE_ANON_KEY exists:', !!supabaseAnonKey);
+
   try {
     const decoded = jwt.verify(token, SUPABASE_JWT_SECRET);
     console.log('Token decoded successfully:', !!decoded);
