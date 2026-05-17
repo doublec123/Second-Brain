@@ -54,12 +54,9 @@ export function Login() {
   const handleAuthSuccess = (user: any) => {
     // 1. Wipe any stale data from a previous session immediately
     queryClient.clear();
-
     // 2. Populate the /me query cache with the new logged-in user
-    if (user) {
-      queryClient.setQueryData(["/api/auth/me"], user);
-    }
-    toast({ title: `Welcome${user?.name ? `, ${user.name}` : ""}!` });
+    queryClient.setQueryData(["/api/auth/me"], user);
+    toast({ title: `Welcome${user.name ? `, ${user.name}` : ""}!` });
     // Small tick to let React flush the cache update before routing
     setTimeout(() => setLocation("/library"), 50);
   };
