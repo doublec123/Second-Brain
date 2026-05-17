@@ -40,25 +40,11 @@ app.use(
     },
   }),
 );
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:8080',
-  'http://localhost:20447',
-  'http://localhost:5000',
-  'https://second-brain-api-server.vercel.app',
-  process.env.FRONTEND_URL || ''
-];
-
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (same-origin via proxy), explicit whitelist, or localhost origins
-    if (!origin || allowedOrigins.includes(origin) || origin.includes("localhost") || origin.includes("127.0.0.1") || origin.includes("vercel.app")) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
+    callback(null, true)
   },
-  credentials: true,
+  credentials: true
 }));
 app.use(authMiddleware);
 app.use(express.json({ limit: "50mb" }));
