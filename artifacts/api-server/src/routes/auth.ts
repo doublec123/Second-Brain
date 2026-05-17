@@ -111,32 +111,44 @@ router.post("/logout", (req, res): void => {
   });
 });
 
+router.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
 router.get("/me", async (req, res): Promise<void> => {
-  const user = (req as any).user;
-  const authError = (req as any).authError;
+  try {
+    const user = (req as any).user;
+    const authError = (req as any).authError;
 
-  if (authError) {
-    res.status(500).json({ error: `Database or authentication error: ${authError}` });
-    return;
+    if (authError) {
+      console.error("Auth middleware reported error:", authError);
+      res.status(500).json({ error: `Database or authentication error: ${authError}` });
+      return;
+    }
+
+    if (!user) {
+      res.status(401).json({ error: "Not authenticated" });
+      return;
+    }
+
+    // Safe type-mapping to prevent any UUID vs integer id mismatches
+    const parsedId = typeof user.id === "string" ? parseInt(user.id, 10) : user.id;
+    const emailStr = user.email || "";
+    const nameStr = user.name || emailStr.split("@")[0] || "Unknown User";
+
+    res.json({
+      id: isNaN(parsedId) ? user.id : parsedId,
+      email: emailStr,
+      name: nameStr,
+      role: user.role || "user",
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      supabaseId: user.supabaseId
+    });
+  } catch (err: any) {
+    console.error("CRITICAL ERROR in /me endpoint:", err);
+    res.status(500).json({ error: "Internal Server Error in /me endpoint", details: err.message });
   }
-
-  if (!user) {
-    res.status(401).json({ error: "Not authenticated" });
-    return;
-  }
-
-  // Safe type-mapping to prevent any UUID vs integer id mismatches
-  const parsedId = typeof user.id === "string" ? parseInt(user.id, 10) : user.id;
-
-  res.json({
-    id: isNaN(parsedId) ? user.id : parsedId,
-    email: user.email,
-    name: user.name || user.email.split("@")[0],
-    role: user.role || "user",
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
-    supabaseId: user.supabaseId
-  });
 });
 
 export default router;
