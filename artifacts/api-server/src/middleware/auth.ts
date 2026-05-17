@@ -3,13 +3,10 @@ import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import jwt from "jsonwebtoken";
-import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET || process.env.JWT_SECRET || "";
 const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || "";
-
-const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -21,19 +18,31 @@ export interface AuthenticatedRequest extends Request {
 }
 
 async function verifyToken(token: string): Promise<{ sub: string; email: string; user_metadata?: any } | null> {
-  // 1. Try Supabase Client API first (handles ES256 and HS256 automatically)
-  if (supabase) {
+  // 1. Try Supabase direct HTTP API first (handles ES256 and HS256 automatically, zero SDK bundling issues)
+  if (supabaseUrl && supabaseAnonKey) {
     try {
-      const { data: { user }, error } = await supabase.auth.getUser(token);
-      if (user && !error) {
-        return {
-          sub: user.id,
-          email: user.email || "",
-          user_metadata: user.user_metadata
-        };
+      const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "apikey": supabaseAnonKey
+        }
+      });
+      if (response.ok) {
+        const user = await response.json() as any;
+        if (user && user.id) {
+          return {
+            sub: user.id,
+            email: user.email || "",
+            user_metadata: user.user_metadata
+          };
+        }
+      } else {
+        const errText = await response.text();
+        logger.error({ status: response.status, response: errText }, "Supabase direct API returned non-OK");
       }
     } catch (e: any) {
-      logger.error({ err: e.message }, "Supabase getUser failed, falling back to local JWT verification");
+      logger.error({ err: e.message }, "Supabase direct API fetch failed, falling back to local JWT");
     }
   }
 
