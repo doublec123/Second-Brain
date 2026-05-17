@@ -4,7 +4,7 @@
   "buildCommand": "pnpm run build",
   "outputDirectory": "artifacts/second-brain/dist/public",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/artifacts/api-server/src/app.ts" },
+    { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
