@@ -90,6 +90,15 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 
 function App() {
   useEffect(() => {
+    // Auto login on return: check for existing session and skip login if found
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session && window.location.pathname === "/login") {
+        window.location.replace("/");
+      }
+    };
+    checkSession();
+
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, _session) => {
