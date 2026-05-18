@@ -73,7 +73,7 @@ export async function authMiddleware(
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
     // Check if session has userId (legacy support or if we still want sessions)
-    const userId = (req.session as any)?.userId;
+    const userId = (req as any).session?.userId;
     if (userId) {
       try {
         const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
@@ -148,8 +148,8 @@ export async function authMiddleware(
       role: user.role,
       supabaseId,
     };
-    (req.session as any).userId = user.id;
-    (req.session as any).userRole = user.role;
+    (req as any).session.userId = user.id;
+    (req as any).session.userRole = user.role;
 
     next();
   } catch (err: any) {

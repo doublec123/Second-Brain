@@ -34,8 +34,8 @@ router.post("/login", async (req, res): Promise<void> => {
           .returning();
       }
 
-      (req.session as any).userId = user.id;
-      (req.session as any).userRole = user.role;
+      (req as any).session.userId = user.id;
+      (req as any).session.userRole = user.role;
       const token = jwt.sign({ userId: user.id, userRole: user.role }, JWT_SECRET, { expiresIn: '7d' });
       const { password: _pwd, ...safeUser } = user;
       res.json({ ...safeUser, token });
@@ -49,8 +49,8 @@ router.post("/login", async (req, res): Promise<void> => {
       return;
     }
 
-    (req.session as any).userId = user.id;
-    (req.session as any).userRole = user.role;
+    (req as any).session.userId = user.id;
+    (req as any).session.userRole = user.role;
     const token = jwt.sign({ userId: user.id, userRole: user.role }, JWT_SECRET, { expiresIn: '7d' });
     const { password: _pwd, ...safeUser } = user;
     res.json({ ...safeUser, token });
@@ -89,8 +89,8 @@ router.post("/signup", async (req, res): Promise<void> => {
       })
       .returning();
 
-    (req.session as any).userId = user.id;
-    (req.session as any).userRole = user.role;
+    (req as any).session.userId = user.id;
+    (req as any).session.userRole = user.role;
     const token = jwt.sign({ userId: user.id, userRole: user.role }, JWT_SECRET, { expiresIn: '7d' });
     const { password: _pwd, ...safeUser } = user;
     res.status(201).json({ ...safeUser, token });
@@ -101,7 +101,7 @@ router.post("/signup", async (req, res): Promise<void> => {
 });
 
 router.post("/logout", (req, res): void => {
-  req.session.destroy((err) => {
+  (req as any).session?.destroy((err) => {
     if (err) {
       res.status(500).json({ error: "Could not log out" });
       return;
