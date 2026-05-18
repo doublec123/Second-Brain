@@ -6,13 +6,7 @@
     "noEmit": true
   },
   "compileOnSave": false,
-  "include": [
-    "api/**/*"
-  ],
   "references": [
-    {
-      "path": "./lib/db"
-    },
     {
       "path": "./lib/api-client-react"
     },
@@ -25,5 +19,6 @@
     {
       "path": "./lib/integrations-openai-ai-react"
     }
-  ]
+  ],
+  "exclude": ["api/", "node_modules"]
 }

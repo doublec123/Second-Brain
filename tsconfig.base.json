@@ -22,5 +22,5 @@
     "types": [],
     "customConditions": ["workspace"]
   },
-  "exclude": ["api/"]
+  "exclude": ["api/", "node_modules"]
 }
