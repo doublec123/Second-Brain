@@ -40,7 +40,10 @@ async function getCachedSession() {
   const now = Date.now();
   // Cache the session promise for 2 seconds to coalesce concurrent requests
   if (!sessionPromise || now - sessionPromiseTime > 2000) {
-    sessionPromise = ensureInitialSession();
+    sessionPromise = (async () => {
+      await ensureInitialSession();
+      return supabase.auth.getSession();
+    })();
     sessionPromiseTime = now;
   }
   return sessionPromise;
@@ -152,7 +155,8 @@ export const useGetMe = () => {
   return useQuery({
     queryKey: ["/api/auth/me"],
     queryFn: async () => {
-      const { data: { session } } = await ensureInitialSession();
+      await ensureInitialSession();
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session || !session.access_token) return null;
 
       // Check if the session is expired
