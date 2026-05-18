@@ -11,18 +11,20 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "7.8.0",
+    "@prisma/client": "^7.8.0",
     "@supabase/supabase-js": "^2.105.4",
     "@workspace/api-zod": "workspace:*",
     "@workspace/integrations-openai-ai-server": "workspace:*",
-    "@prisma/client": "^7.8.0",
-    "prisma": "^7.8.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2",
     "express": "^5",
     "express-session": "catalog:",
     "jsonwebtoken": "^9.0.3",
+    "pg": "^8.20.0",
     "pino": "^9",
     "pino-http": "^10",
+    "prisma": "^7.8.0",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -32,6 +34,7 @@
     "@types/express-session": "catalog:",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "catalog:",
+    "@types/pg": "^8.20.0",
     "esbuild": "^0.27.3",
     "esbuild-plugin-pino": "^2.3.3",
     "pino-pretty": "^13",
