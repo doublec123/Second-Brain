@@ -12,7 +12,7 @@ import { SemanticSearch } from "@/pages/SemanticSearch";
 import { Login } from "@/pages/Login";
 import { Admin } from "@/pages/Admin";
 import KnowledgeGraph from "@/pages/KnowledgeGraph";
-import { useGetMe } from "@/api/authHooks";
+import { useGetMe, ensureInitialSession } from "@/api/authHooks";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
@@ -92,7 +92,7 @@ function App() {
   useEffect(() => {
     // Auto login on return: check for existing session and skip login if found
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await ensureInitialSession();
       if (session && window.location.pathname === "/login") {
         window.location.replace("/");
       }

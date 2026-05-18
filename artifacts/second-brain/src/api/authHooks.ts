@@ -8,12 +8,20 @@ import { supabase } from "@/lib/supabase";
 // Cache the session promise to prevent 429 rate limits when multiple queries mount concurrently
 let sessionPromise: Promise<any> | null = null;
 let sessionPromiseTime = 0;
+let initialSessionPromise: Promise<any> | null = null;
+
+export function ensureInitialSession() {
+  if (!initialSessionPromise) {
+    initialSessionPromise = supabase.auth.getSession().then((res) => res);
+  }
+  return initialSessionPromise;
+}
 
 async function getCachedSession() {
   const now = Date.now();
   // Cache the session promise for 2 seconds to coalesce concurrent requests
   if (!sessionPromise || now - sessionPromiseTime > 2000) {
-    sessionPromise = supabase.auth.getSession();
+    sessionPromise = ensureInitialSession();
     sessionPromiseTime = now;
   }
   return sessionPromise;
@@ -125,7 +133,7 @@ export const useGetMe = () => {
   return useQuery({
     queryKey: ["/api/auth/me"],
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await ensureInitialSession();
       if (!session || !session.access_token) return null;
 
       // Check if the session is expired
