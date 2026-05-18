@@ -1,4 +1,4 @@
-import express, { type Request, type Response, type NextFunction } from 'express';
+import express, { type Request, type Response as ExpressResponse, type NextFunction } from 'express';
 import { prisma } from "../lib/prisma.js";
 import { logger } from "../lib/logger.js";
 import jwt from "jsonwebtoken";
@@ -66,7 +66,7 @@ async function verifyToken(token: string): Promise<{ sub: string; email: string;
 
 export const authMiddleware = async (
   req: AuthenticatedRequest,
-  res: Response,
+  res: ExpressResponse,
   next: NextFunction
 ): Promise<void> => {
   const authHeader = req.headers.authorization;
@@ -181,7 +181,7 @@ export const authMiddleware = async (
 }
 
 /** Legacy alias for authenticate */
-export const authenticate = (req: Request, res: Response, next: NextFunction) => {
+export const authenticate = (req: Request, res: ExpressResponse, next: NextFunction) => {
   if (!(req as any).user) {
     return res.status(401).json({ error: "Unauthorized. Please log in." });
   }
@@ -189,7 +189,7 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
 };
 
 /** Require admin access */
-export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
+export const isAdmin = (req: Request, res: ExpressResponse, next: NextFunction) => {
   const user = (req as any).user;
   if (!user || user.role !== "admin") {
     return res.status(403).json({ error: "Forbidden. Admin access required." });
