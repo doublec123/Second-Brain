@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express from "express";
 import cors from "cors";
 import session from "express-session";
 import { pinoHttp } from "pino-http";
@@ -7,7 +7,7 @@ import { logger } from "./lib/logger.js";
 
 import { authMiddleware } from "./middlewares/auth.js";
 
-const app: Express = express();
+const app = express();
 
 app.use(
   session({
