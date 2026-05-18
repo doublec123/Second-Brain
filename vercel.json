@@ -9,7 +9,7 @@
   ],
   "functions": {
     "api/index.ts": {
-      "includeFiles": "{prisma.config.ts,prisma/schema.prisma,artifacts/api-server/dist/**}"
+      "includeFiles": "artifacts/api-server/dist/**"
     }
   }
 }
