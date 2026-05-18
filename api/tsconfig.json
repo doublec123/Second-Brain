@@ -1,7 +1,7 @@
 {
   "extends": "../artifacts/api-server/tsconfig.json",
   "compilerOptions": {
-    "rootDir": ".",
+    "rootDir": "..",
     "outDir": "../dist/api"
   },
   "include": ["./**/*.ts"],
