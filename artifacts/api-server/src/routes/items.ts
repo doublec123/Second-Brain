@@ -89,7 +89,7 @@ function extractJson(text: string) {
 const router: IRouter = Router();
 
 router.get("/items/stats", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const items = await db.select().from(knowledgeItemsTable).where(eq(knowledgeItemsTable.userId, userId));
 
   const byType = { link: 0, image: 0, text: 0 };
@@ -109,7 +109,7 @@ router.get("/items/stats", authenticate, async (req, res): Promise<void> => {
 });
 
 router.get("/items/search", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const parsed = SemanticSearchQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -180,7 +180,7 @@ router.get("/items/search", authenticate, async (req, res): Promise<void> => {
 });
 
 router.get("/items", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const parsed = ListItemsQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -256,7 +256,7 @@ router.get("/items", authenticate, async (req, res): Promise<void> => {
 });
 
 router.post("/items", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const parsed = CreateItemBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -383,7 +383,7 @@ router.post("/items", authenticate, async (req, res): Promise<void> => {
 });
 
 router.get("/items/:id", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const params = GetItemParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -404,7 +404,7 @@ router.get("/items/:id", authenticate, async (req, res): Promise<void> => {
 });
 
 router.patch("/items/:id", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const params = UpdateItemParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -442,7 +442,7 @@ router.patch("/items/:id", authenticate, async (req, res): Promise<void> => {
 });
 
 router.delete("/items/:id", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const params = DeleteItemParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -463,7 +463,7 @@ router.delete("/items/:id", authenticate, async (req, res): Promise<void> => {
 });
 
 router.post("/items/:id/process", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const params = ProcessItemParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -562,7 +562,7 @@ router.post("/items/:id/process", authenticate, async (req, res): Promise<void> 
 });
 
 router.post("/items/:id/generate-guide", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const params = GenerateGuideParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -644,7 +644,7 @@ Guide Type: ${parsed.data.guideType}`,
 });
 
 router.get("/items/:id/related", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const params = GetRelatedItemsParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -684,7 +684,7 @@ router.get("/items/:id/related", authenticate, async (req, res): Promise<void> =
 });
 
 router.post("/items/:id/export", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const params = ExportItemParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });

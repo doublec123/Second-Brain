@@ -7,7 +7,7 @@ import { authenticate } from "../middlewares/auth";
 const router: IRouter = Router();
 
 router.get("/tags", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const tags = await db.select().from(tagsTable).where(eq(tagsTable.userId, userId));
   const items = await db.select().from(knowledgeItemsTable).where(eq(knowledgeItemsTable.userId, userId));
 
@@ -20,7 +20,7 @@ router.get("/tags", authenticate, async (req, res): Promise<void> => {
 });
 
 router.post("/tags", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const parsed = CreateTagBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });

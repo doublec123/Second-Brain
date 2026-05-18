@@ -58,7 +58,7 @@ export function Login() {
     queryClient.setQueryData(["/api/auth/me"], user);
     toast({ title: `Welcome${user.name ? `, ${user.name}` : ""}!` });
     // Small tick to let React flush the cache update before routing
-    setTimeout(() => setLocation("/library"), 50);
+    setTimeout(() => setLocation("/"), 50);
   };
 
   const handleSubmit = (e: React.FormEvent) => {

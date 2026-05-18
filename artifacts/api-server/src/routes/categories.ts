@@ -15,7 +15,7 @@ import { authenticate } from "../middlewares/auth";
 const router: IRouter = Router();
 
 router.get("/categories", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const categories = await db.select().from(categoriesTable).where(eq(categoriesTable.userId, userId));
   
   // Get item counts for each category (filtered by user)
@@ -38,7 +38,7 @@ router.get("/categories", authenticate, async (req, res): Promise<void> => {
 });
 
 router.post("/categories", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const parsed = CreateCategoryBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -57,7 +57,7 @@ router.post("/categories", authenticate, async (req, res): Promise<void> => {
 });
 
 router.patch("/categories/:id", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const id = parseInt(req.params.id as string);
   const parsed = UpdateCategoryBody.safeParse(req.body);
   if (!parsed.success) {
@@ -80,7 +80,7 @@ router.patch("/categories/:id", authenticate, async (req, res): Promise<void> =>
 });
 
 router.delete("/categories/:id", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const id = parseInt(req.params.id as string);
   
   const [category] = await db

@@ -6,7 +6,7 @@ import { authenticate } from "../middlewares/auth";
 const router: IRouter = Router();
 
 router.get("/api/graph/data", authenticate, async (req, res) => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
 
   const items = await db
     .select()

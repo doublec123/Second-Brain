@@ -9,7 +9,7 @@ const router: IRouter = Router();
 
 // List notes for an item
 router.get("/items/:id/notes", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const itemId = parseInt(req.params.id as string);
 
   // Verify item belongs to user
@@ -33,7 +33,7 @@ router.get("/items/:id/notes", authenticate, async (req, res): Promise<void> => 
 
 // Create a note
 router.post("/items/:id/notes", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const itemId = parseInt(req.params.id as string);
   const { type, format, target, content } = req.body;
 
@@ -63,7 +63,7 @@ router.post("/items/:id/notes", authenticate, async (req, res): Promise<void> =>
 
 // Update a note
 router.patch("/notes/:id", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const noteId = parseInt(req.params.id as string);
   const { type, format, target, content } = req.body;
 
@@ -92,7 +92,7 @@ router.patch("/notes/:id", authenticate, async (req, res): Promise<void> => {
 
 // Delete a note
 router.delete("/notes/:id", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const noteId = parseInt(req.params.id as string);
 
   // Verify note belongs to user's item
@@ -115,7 +115,7 @@ router.delete("/notes/:id", authenticate, async (req, res): Promise<void> => {
 
 // AI Enhance a note
 router.post("/notes/:id/enhance", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const noteId = parseInt(req.params.id as string);
 
   const [noteWithUser] = await db

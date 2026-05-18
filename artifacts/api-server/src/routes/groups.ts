@@ -13,7 +13,7 @@ import { authenticate } from "../middlewares/auth";
 const router: IRouter = Router();
 
 router.get("/groups", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const categoryId = req.query.categoryId ? parseInt(req.query.categoryId as string) : null;
   
   let query = db.select().from(noteGroupsTable).where(eq(noteGroupsTable.userId, userId));
@@ -28,7 +28,7 @@ router.get("/groups", authenticate, async (req, res): Promise<void> => {
 });
 
 router.post("/groups", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const parsed = CreateGroupBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -47,7 +47,7 @@ router.post("/groups", authenticate, async (req, res): Promise<void> => {
 });
 
 router.get("/groups/:id", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const id = parseInt(req.params.id as string);
   const [group] = await db
     .select()
@@ -69,7 +69,7 @@ router.get("/groups/:id", authenticate, async (req, res): Promise<void> => {
 });
 
 router.patch("/groups/:id", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const id = parseInt(req.params.id as string);
   const parsed = UpdateGroupBody.safeParse(req.body);
   if (!parsed.success) {
@@ -92,7 +92,7 @@ router.patch("/groups/:id", authenticate, async (req, res): Promise<void> => {
 });
 
 router.delete("/groups/:id", authenticate, async (req, res): Promise<void> => {
-  const userId = (req.session as any).userId;
+  const userId = (req as any).user?.id;
   const id = parseInt(req.params.id as string);
   
   // Verify ownership of the group first
