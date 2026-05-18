@@ -1,9 +1,9 @@
-import { Router, type IRouter } from "express";
+import { Router } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db, knowledgeItemsTable } from "@workspace/db";
 import { authenticate } from "../middlewares/auth.js";
 
-const router: IRouter = Router();
+const router = Router();
 
 router.get("/api/graph/data", authenticate, async (req, res) => {
   const userId = (req as any).user?.id;

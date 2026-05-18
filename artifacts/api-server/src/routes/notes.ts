@@ -1,11 +1,11 @@
-import { Router, type IRouter } from "express";
+import { Router } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, personalNotesTable, knowledgeItemsTable } from "@workspace/db";
 import { authenticate } from "../middlewares/auth.js";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { logger } from "../lib/logger.js";
 
-const router: IRouter = Router();
+const router = Router();
 
 // List notes for an item
 router.get("/items/:id/notes", authenticate, async (req, res): Promise<void> => {

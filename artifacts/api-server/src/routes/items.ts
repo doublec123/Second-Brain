@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router } from "express";
 import { eq, ilike, sql, desc, or, and } from "drizzle-orm";
 import { db, knowledgeItemsTable, tagsTable, knowledgeItemCategoriesTable, categoriesTable } from "@workspace/db";
 import {
@@ -86,7 +86,7 @@ function extractJson(text: string) {
   }
 }
 
-const router: IRouter = Router();
+const router = Router();
 
 router.get("/items/stats", authenticate, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;

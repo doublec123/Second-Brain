@@ -1,10 +1,10 @@
-import { Router, type IRouter } from "express";
+import { Router } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, tagsTable, knowledgeItemsTable } from "@workspace/db";
 import { CreateTagBody } from "@workspace/api-zod";
 import { authenticate } from "../middlewares/auth.js";
 
-const router: IRouter = Router();
+const router = Router();
 
 router.get("/tags", authenticate, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;

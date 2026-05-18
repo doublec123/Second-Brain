@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router } from "express";
 import { eq, desc, and } from "drizzle-orm";
 import { db, noteGroupsTable, knowledgeItemsTable } from "@workspace/db";
 import { z } from "zod";
@@ -10,7 +10,7 @@ const CreateGroupBody = z.object({
 const UpdateGroupBody = CreateGroupBody.partial();
 import { authenticate } from "../middlewares/auth.js";
 
-const router: IRouter = Router();
+const router = Router();
 
 router.get("/groups", authenticate, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;

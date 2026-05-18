@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router } from "express";
 import { eq, sql, and } from "drizzle-orm";
 import { db, categoriesTable, knowledgeItemCategoriesTable, knowledgeItemsTable } from "@workspace/db";
 import { z } from "zod";
@@ -12,7 +12,7 @@ const CreateCategoryBody = z.object({
 const UpdateCategoryBody = CreateCategoryBody.partial();
 import { authenticate } from "../middlewares/auth.js";
 
-const router: IRouter = Router();
+const router = Router();
 
 router.get("/categories", authenticate, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
