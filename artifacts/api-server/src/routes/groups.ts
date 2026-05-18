@@ -8,7 +8,7 @@ const CreateGroupBody = z.object({
   description: z.string().optional(),
 });
 const UpdateGroupBody = CreateGroupBody.partial();
-import { authenticate } from "../middlewares/auth";
+import { authenticate } from "../middlewares/auth.js";
 
 const router: IRouter = Router();
 

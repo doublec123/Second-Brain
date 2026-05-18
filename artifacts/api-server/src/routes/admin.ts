@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { db, usersTable, knowledgeItemsTable } from "@workspace/db";
 import { eq, count } from "drizzle-orm";
-import { authenticate, isAdmin } from "../middlewares/auth";
-import { logger } from "../lib/logger";
+import { authenticate, isAdmin } from "../middlewares/auth.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 

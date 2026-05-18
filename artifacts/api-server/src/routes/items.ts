@@ -16,9 +16,9 @@ import {
   SemanticSearchQueryParams,
 } from "@workspace/api-zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { logger } from "../lib/logger";
-import { fetchYouTubeTranscript, isYouTubeUrl } from "../lib/youtube";
-import { authenticate } from "../middlewares/auth";
+import { logger } from "../lib/logger.js";
+import { fetchYouTubeTranscript, isYouTubeUrl } from "../lib/youtube.js";
+import { authenticate } from "../middlewares/auth.js";
 import fs from "fs";
 import path from "path";
 

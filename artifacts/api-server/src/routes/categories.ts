@@ -10,7 +10,7 @@ const CreateCategoryBody = z.object({
   icon: z.string().optional(),
 });
 const UpdateCategoryBody = CreateCategoryBody.partial();
-import { authenticate } from "../middlewares/auth";
+import { authenticate } from "../middlewares/auth.js";
 
 const router: IRouter = Router();
 

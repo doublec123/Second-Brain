@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, tagsTable, knowledgeItemsTable } from "@workspace/db";
 import { CreateTagBody } from "@workspace/api-zod";
-import { authenticate } from "../middlewares/auth";
+import { authenticate } from "../middlewares/auth.js";
 
 const router: IRouter = Router();
 
