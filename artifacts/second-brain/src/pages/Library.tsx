@@ -181,7 +181,7 @@ export function Library() {
           </div>
         ) : items && items.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map((item, idx) => (
+            {(Array.isArray(items) ? items : []).map((item, idx) => (
               <ItemCard key={`${item.id}-${idx}`} item={item} />
             ))}
           </div>

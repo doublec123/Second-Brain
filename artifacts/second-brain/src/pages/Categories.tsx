@@ -70,7 +70,7 @@ export function Categories() {
           <div className="space-y-1">
             {isCatsLoading ? (
               [...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full rounded-md" />)
-            ) : categories?.map((cat) => (
+            ) : (Array.isArray(categories) ? categories : []).map((cat) => (
               <div
                 key={cat.id}
                 role="button"
@@ -167,7 +167,7 @@ export function Categories() {
             </div>
           ) : groups && groups.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {groups.map((group) => (
+              {(Array.isArray(groups) ? groups : []).map((group) => (
                 <div 
                   key={group.id}
                   className="group bg-card border border-card-border rounded-2xl p-5 hover:shadow-xl hover:shadow-primary/5 transition-all cursor-pointer relative overflow-hidden"

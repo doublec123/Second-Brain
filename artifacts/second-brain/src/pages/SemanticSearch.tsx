@@ -115,7 +115,7 @@ export function SemanticSearch() {
                   <span className="text-sm font-medium text-primary">"{debouncedQuery}"</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {results.map((item) => (
+                  {(Array.isArray(results) ? results : []).map((item) => (
                     <ItemCard key={item.id} item={item} />
                   ))}
                 </div>

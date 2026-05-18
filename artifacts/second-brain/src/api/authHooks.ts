@@ -4,8 +4,23 @@ import { supabase } from "@/lib/supabase";
 // ---------------------------------------------------------------------------
 // Shared fetch helper — redirects to /login on any 401
 // ---------------------------------------------------------------------------
+
+// Cache the session promise to prevent 429 rate limits when multiple queries mount concurrently
+let sessionPromise: Promise<any> | null = null;
+let sessionPromiseTime = 0;
+
+async function getCachedSession() {
+  const now = Date.now();
+  // Cache the session promise for 2 seconds to coalesce concurrent requests
+  if (!sessionPromise || now - sessionPromiseTime > 2000) {
+    sessionPromise = supabase.auth.getSession();
+    sessionPromiseTime = now;
+  }
+  return sessionPromise;
+}
+
 async function apiFetch(input: RequestInfo, init?: RequestInit): Promise<Response> {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await getCachedSession();
   const token = session?.access_token;
 
   const headers = new Headers(init?.headers);

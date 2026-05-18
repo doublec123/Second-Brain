@@ -78,7 +78,7 @@ export function Admin() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-card-border">
-                {users?.map((user) => (
+                {(Array.isArray(users) ? users : []).map((user) => (
                   <tr key={user.id} className="hover:bg-muted/5 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">

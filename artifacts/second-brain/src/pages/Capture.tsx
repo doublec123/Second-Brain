@@ -313,7 +313,7 @@ export function Capture() {
                   onChange={(e) => setSelectedGroupId(e.target.value ? parseInt(e.target.value) : undefined)}
                 >
                   <option value="">New/None</option>
-                  {groups?.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
+                  {(Array.isArray(groups) ? groups : []).map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
                 </select>
               </div>
               <div className="space-y-2">
@@ -324,7 +324,7 @@ export function Capture() {
                   value={selectedCategoryIds.map(String)}
                   onChange={(e) => setSelectedCategoryIds(Array.from(e.target.selectedOptions, o => parseInt(o.value)))}
                 >
-                  {categories?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {(Array.isArray(categories) ? categories : []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
                 <p className="text-[10px] text-muted-foreground">Hold Ctrl to select multiple</p>
               </div>
