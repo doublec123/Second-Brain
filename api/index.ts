@@ -1,2 +1,4 @@
 // @ts-nocheck
-export { default } from "../artifacts/api-server/dist/app.mjs";
+import app from "../artifacts/api-server/dist/app.mjs";
+console.log('App loaded:', !!app);
+export default app;
