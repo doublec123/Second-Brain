@@ -12,7 +12,26 @@ let initialSessionPromise: Promise<any> | null = null;
 
 export function ensureInitialSession() {
   if (!initialSessionPromise) {
-    initialSessionPromise = supabase.auth.getSession().then((res) => res);
+    initialSessionPromise = new Promise((resolve) => {
+      supabase.auth.getSession().then((res) => {
+        if (res.data.session) {
+          resolve(res);
+        } else {
+          // Wait briefly for hydration to avoid race conditions
+          const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === "INITIAL_SESSION" || event === "SIGNED_IN") {
+              subscription.unsubscribe();
+              resolve({ data: { session } });
+            }
+          });
+          // Fallback timeout if truly logged out
+          setTimeout(() => {
+            subscription.unsubscribe();
+            resolve({ data: { session: null } });
+          }, 800);
+        }
+      });
+    });
   }
   return initialSessionPromise;
 }

@@ -15,7 +15,8 @@ export interface AuthenticatedRequest extends Request {
 async function verifyToken(token: string): Promise<{ sub: string; email: string; user_metadata?: any } | null> {
   if (supabaseUrl && supabaseAnonKey) {
     try {
-      const fetchRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      const baseUrl = supabaseUrl.replace(/\/$/, '');
+      const fetchRes = await fetch(`${baseUrl}/auth/v1/user`, {
         method: 'GET',
         headers: { Authorization: `Bearer ${token}`, apikey: supabaseAnonKey },
       })
