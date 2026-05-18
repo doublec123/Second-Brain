@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm run build && pnpm run start",
-    "build": "node ./build.mjs",
+    "postinstall": "prisma generate --schema ../../prisma/schema.prisma",
+    "build": "prisma generate --schema ../../prisma/schema.prisma && node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
@@ -14,6 +15,7 @@
     "@workspace/api-zod": "workspace:*",
     "@workspace/integrations-openai-ai-server": "workspace:*",
     "@prisma/client": "^7.8.0",
+    "prisma": "^7.8.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2",
     "express": "^5",
