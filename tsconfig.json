@@ -6,6 +6,7 @@
     "noEmit": true
   },
   "compileOnSave": false,
+  "include": [],
   "references": [
     {
       "path": "./lib/api-client-react"
