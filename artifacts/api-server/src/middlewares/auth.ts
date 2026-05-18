@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, usersTable, knowledgeItemsTable, categoriesTable, tagsTable, noteGroupsTable } from "@workspace/db";
+import { eq, isNull } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import jwt from "jsonwebtoken";
 
@@ -78,8 +78,9 @@ export async function authMiddleware(
       try {
         const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
         if (user) {
+          const parsedId = typeof user.id === "string" ? parseInt(user.id, 10) : user.id;
           req.user = {
-            id: user.id,
+            id: isNaN(parsedId) ? user.id : parsedId,
             email: user.email,
             role: user.role,
             supabaseId: "",
@@ -142,14 +143,39 @@ export async function authMiddleware(
       logger.info({ userId: user.id, email }, "Auto-provisioned user from Supabase token");
     }
 
+    const parsedId = typeof user.id === "string" ? parseInt(user.id, 10) : user.id;
+    const finalUserId = isNaN(parsedId) ? user.id : parsedId;
+
     req.user = {
-      id: user.id,
+      id: finalUserId,
       email: user.email,
       role: user.role,
       supabaseId,
     };
-    (req as any).session.userId = user.id;
+    (req as any).session.userId = finalUserId;
     (req as any).session.userRole = user.role;
+
+    // Self-healing: associate orphaned records with the authenticated user
+    try {
+      await db
+        .update(knowledgeItemsTable)
+        .set({ userId: finalUserId })
+        .where(isNull(knowledgeItemsTable.userId));
+      await db
+        .update(categoriesTable)
+        .set({ userId: finalUserId })
+        .where(isNull(categoriesTable.userId));
+      await db
+        .update(tagsTable)
+        .set({ userId: finalUserId })
+        .where(isNull(tagsTable.userId));
+      await db
+        .update(noteGroupsTable)
+        .set({ userId: finalUserId })
+        .where(isNull(noteGroupsTable.userId));
+    } catch (dbErr) {
+      logger.error({ err: dbErr }, "Failed to run self-healing on orphaned records");
+    }
 
     next();
   } catch (err: any) {
