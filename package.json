@@ -17,6 +17,9 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild"
-    ]
+    ],
+    "overrides": {
+      "drizzle-orm": "^0.30.0"
+    }
   }
 }

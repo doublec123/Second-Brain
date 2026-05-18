@@ -1,4 +1,4 @@
-import type { Request, Response, NextFunction } from "express";
+import express, { type Request, type Response, type NextFunction } from 'express';
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
@@ -65,11 +65,11 @@ async function verifyToken(token: string): Promise<{ sub: string; email: string;
   return null;
 }
 
-export async function authMiddleware(
+export const authMiddleware = async (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
-) {
+): Promise<void> => {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
     return next();
