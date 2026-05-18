@@ -503,7 +503,7 @@ export function ItemDetail() {
                   Related Items
                 </h3>
                 <div className="space-y-2">
-                  {related.slice(0, 4).map((rel) => (
+                  {(Array.isArray(related) ? related : []).slice(0, 4).map((rel) => (
                     <ItemCard key={rel.id} item={rel} className="!p-3" />
                   ))}
                 </div>

@@ -40,7 +40,7 @@ export function Dashboard() {
   });
   const { data: items, isLoading: itemsLoading } = useListItems();
 
-  const recentItems = items?.slice(0, 6) ?? [];
+  const recentItems = (Array.isArray(items) ? items : []).slice(0, 6);
 
   return (
     <Layout>

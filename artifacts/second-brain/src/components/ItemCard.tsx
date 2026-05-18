@@ -96,7 +96,7 @@ export function ItemCard({ item, className }: ItemCardProps) {
         {/* Key Concepts */}
         {item.keyConcepts.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-3">
-            {item.keyConcepts.slice(0, 4).map((concept, idx) => (
+            {(Array.isArray(item.keyConcepts) ? item.keyConcepts : []).slice(0, 4).map((concept, idx) => (
               <span
                 key={`${concept}-${idx}`}
                 className="text-xs bg-primary/8 text-primary px-2 py-0.5 rounded-md font-medium"
@@ -113,7 +113,7 @@ export function ItemCard({ item, className }: ItemCardProps) {
         {/* Tags + Date */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex flex-wrap gap-1">
-            {item.tags.slice(0, 3).map((tag, idx) => (
+            {(Array.isArray(item.tags) ? item.tags : []).slice(0, 3).map((tag, idx) => (
               <Badge key={`${tag}-${idx}`} variant="secondary" className="text-xs py-0 px-1.5 h-5">
                 {tag}
               </Badge>
