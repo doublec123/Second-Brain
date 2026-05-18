@@ -9,11 +9,11 @@ const CreateCategoryBody = z.object({
   icon: z.string().optional(),
 });
 const UpdateCategoryBody = CreateCategoryBody.partial();
-import { authenticate } from "../middlewares/auth.js";
+import { requireAuth } from "../middlewares/auth.js";
 
 const router = Router();
 
-router.get("/categories", authenticate, async (req, res): Promise<void> => {
+router.get("/categories", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const categories = await prisma.categories.findMany({
     where: { user_id: userId },
@@ -34,7 +34,7 @@ router.get("/categories", authenticate, async (req, res): Promise<void> => {
   res.json(result);
 });
 
-router.post("/categories", authenticate, async (req, res): Promise<void> => {
+router.post("/categories", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const parsed = CreateCategoryBody.safeParse(req.body);
   if (!parsed.success) {
@@ -52,7 +52,7 @@ router.post("/categories", authenticate, async (req, res): Promise<void> => {
   res.status(201).json({ ...category, itemCount: 0 });
 });
 
-router.patch("/categories/:id", authenticate, async (req, res): Promise<void> => {
+router.patch("/categories/:id", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const id = parseInt(req.params.id as string);
   const parsed = UpdateCategoryBody.safeParse(req.body);
@@ -78,7 +78,7 @@ router.patch("/categories/:id", authenticate, async (req, res): Promise<void> =>
   res.json(category);
 });
 
-router.delete("/categories/:id", authenticate, async (req, res): Promise<void> => {
+router.delete("/categories/:id", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const id = parseInt(req.params.id as string);
   

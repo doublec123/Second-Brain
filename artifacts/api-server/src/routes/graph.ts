@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
-import { authenticate } from "../middlewares/auth.js";
+import { requireAuth } from "../middlewares/auth.js";
 
 const router = Router();
 
-router.get("/api/graph/data", authenticate, async (req, res) => {
+router.get("/api/graph/data", requireAuth, async (req, res) => {
   const userId = (req as any).user?.id;
 
   const items = await prisma.knowledge_items.findMany({

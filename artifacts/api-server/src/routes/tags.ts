@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { CreateTagBody } from "@workspace/api-zod";
-import { authenticate } from "../middlewares/auth.js";
+import { requireAuth } from "../middlewares/auth.js";
 
 const router = Router();
 
-router.get("/tags", authenticate, async (req, res): Promise<void> => {
+router.get("/tags", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const tags = await prisma.tags.findMany({ where: { user_id: userId } });
   const items = await prisma.knowledge_items.findMany({ where: { user_id: userId } });
@@ -18,7 +18,7 @@ router.get("/tags", authenticate, async (req, res): Promise<void> => {
   res.json(result);
 });
 
-router.post("/tags", authenticate, async (req, res): Promise<void> => {
+router.post("/tags", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const parsed = CreateTagBody.safeParse(req.body);
   if (!parsed.success) {

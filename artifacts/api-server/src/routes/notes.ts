@@ -1,13 +1,13 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
-import { authenticate } from "../middlewares/auth.js";
+import { requireAuth } from "../middlewares/auth.js";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
 
 // List notes for an item
-router.get("/items/:id/notes", authenticate, async (req, res): Promise<void> => {
+router.get("/items/:id/notes", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const itemId = parseInt(req.params.id as string);
 
@@ -29,7 +29,7 @@ router.get("/items/:id/notes", authenticate, async (req, res): Promise<void> => 
 });
 
 // Create a note
-router.post("/items/:id/notes", authenticate, async (req, res): Promise<void> => {
+router.post("/items/:id/notes", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const itemId = parseInt(req.params.id as string);
   const { type, format, target, content } = req.body;
@@ -57,7 +57,7 @@ router.post("/items/:id/notes", authenticate, async (req, res): Promise<void> =>
 });
 
 // Update a note
-router.patch("/notes/:id", authenticate, async (req, res): Promise<void> => {
+router.patch("/notes/:id", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const noteId = parseInt(req.params.id as string);
   const { type, format, target, content } = req.body;
@@ -90,7 +90,7 @@ router.patch("/notes/:id", authenticate, async (req, res): Promise<void> => {
 });
 
 // Delete a note
-router.delete("/notes/:id", authenticate, async (req, res): Promise<void> => {
+router.delete("/notes/:id", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const noteId = parseInt(req.params.id as string);
 
@@ -118,7 +118,7 @@ router.delete("/notes/:id", authenticate, async (req, res): Promise<void> => {
 });
 
 // AI Enhance a note
-router.post("/notes/:id/enhance", authenticate, async (req, res): Promise<void> => {
+router.post("/notes/:id/enhance", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const noteId = parseInt(req.params.id as string);
 

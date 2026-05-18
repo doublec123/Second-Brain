@@ -17,7 +17,7 @@ import {
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { logger } from "../lib/logger.js";
 import { fetchYouTubeTranscript, isYouTubeUrl } from "../lib/youtube.js";
-import { authenticate } from "../middlewares/auth.js";
+import { requireAuth } from "../middlewares/auth.js";
 
 function mapItemToCamelCase(item: any) {
   if (!item) return item;
@@ -113,7 +113,7 @@ function extractJson(text: string) {
 
 const router = Router();
 
-router.get("/items/stats", authenticate, async (req, res): Promise<void> => {
+router.get("/items/stats", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const items = await prisma.knowledge_items.findMany({
     where: { user_id: userId }
@@ -135,7 +135,7 @@ router.get("/items/stats", authenticate, async (req, res): Promise<void> => {
   res.json({ total: items.length, byType, byStatus, recentCount });
 });
 
-router.get("/items/search", authenticate, async (req, res): Promise<void> => {
+router.get("/items/search", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const parsed = SemanticSearchQueryParams.safeParse(req.query);
   if (!parsed.success) {
@@ -202,7 +202,7 @@ router.get("/items/search", authenticate, async (req, res): Promise<void> => {
   }
 });
 
-router.get("/items", authenticate, async (req, res): Promise<void> => {
+router.get("/items", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const parsed = ListItemsQueryParams.safeParse(req.query);
   if (!parsed.success) {
@@ -266,7 +266,7 @@ router.get("/items", authenticate, async (req, res): Promise<void> => {
   res.json(items.map(mapItemToCamelCase));
 });
 
-router.post("/items", authenticate, async (req, res): Promise<void> => {
+router.post("/items", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const parsed = CreateItemBody.safeParse(req.body);
   if (!parsed.success) {
@@ -396,7 +396,7 @@ router.post("/items", authenticate, async (req, res): Promise<void> => {
   res.status(201).json(mapItemToCamelCase(item));
 });
 
-router.get("/items/:id", authenticate, async (req, res): Promise<void> => {
+router.get("/items/:id", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const params = GetItemParams.safeParse(req.params);
   if (!params.success) {
@@ -416,7 +416,7 @@ router.get("/items/:id", authenticate, async (req, res): Promise<void> => {
   res.json(mapItemToCamelCase(item));
 });
 
-router.patch("/items/:id", authenticate, async (req, res): Promise<void> => {
+router.patch("/items/:id", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const params = UpdateItemParams.safeParse(req.params);
   if (!params.success) {
@@ -456,7 +456,7 @@ router.patch("/items/:id", authenticate, async (req, res): Promise<void> => {
   res.json(mapItemToCamelCase(item));
 });
 
-router.delete("/items/:id", authenticate, async (req, res): Promise<void> => {
+router.delete("/items/:id", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const params = DeleteItemParams.safeParse(req.params);
   if (!params.success) {
@@ -480,7 +480,7 @@ router.delete("/items/:id", authenticate, async (req, res): Promise<void> => {
   res.sendStatus(204);
 });
 
-router.post("/items/:id/process", authenticate, async (req, res): Promise<void> => {
+router.post("/items/:id/process", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const params = ProcessItemParams.safeParse(req.params);
   if (!params.success) {
@@ -581,7 +581,7 @@ router.post("/items/:id/process", authenticate, async (req, res): Promise<void> 
   }
 });
 
-router.post("/items/:id/generate-guide", authenticate, async (req, res): Promise<void> => {
+router.post("/items/:id/generate-guide", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const params = GenerateGuideParams.safeParse(req.params);
   if (!params.success) {
@@ -662,7 +662,7 @@ Guide Type: ${parsed.data.guideType}`,
   });
 });
 
-router.get("/items/:id/related", authenticate, async (req, res): Promise<void> => {
+router.get("/items/:id/related", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const params = GetRelatedItemsParams.safeParse(req.params);
   if (!params.success) {
@@ -703,7 +703,7 @@ router.get("/items/:id/related", authenticate, async (req, res): Promise<void> =
   res.json(related);
 });
 
-router.post("/items/:id/export", authenticate, async (req, res): Promise<void> => {
+router.post("/items/:id/export", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const params = ExportItemParams.safeParse(req.params);
   if (!params.success) {

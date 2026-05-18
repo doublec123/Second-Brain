@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
-import { authenticate, isAdmin } from "../middlewares/auth.js";
+import { requireAuth, requireAdmin } from "../middlewares/auth.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
@@ -8,7 +8,7 @@ const router = Router();
 /**
  * @summary Get all users (Admin only)
  */
-router.get("/users", authenticate, isAdmin, async (req, res) => {
+router.get("/users", requireAuth, requireAdmin, async (req, res) => {
   try {
     const users = await prisma.users.findMany({
       include: {
@@ -37,7 +37,7 @@ router.get("/users", authenticate, isAdmin, async (req, res) => {
 /**
  * @summary Delete user and all their data (Admin only)
  */
-router.delete("/users/:id", authenticate, isAdmin, async (req, res): Promise<void> => {
+router.delete("/users/:id", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const { id } = req.params;
   const userId = parseInt(id as string);
   if (isNaN(userId)) {
@@ -60,7 +60,7 @@ router.delete("/users/:id", authenticate, isAdmin, async (req, res): Promise<voi
 /**
  * @summary Get global system stats (Admin only)
  */
-router.get("/stats", authenticate, isAdmin, async (req, res) => {
+router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
   try {
     const userCount = await prisma.users.count();
     const itemCount = await prisma.knowledge_items.count();

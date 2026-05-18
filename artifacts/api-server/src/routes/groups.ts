@@ -7,11 +7,11 @@ const CreateGroupBody = z.object({
   description: z.string().optional(),
 });
 const UpdateGroupBody = CreateGroupBody.partial();
-import { authenticate } from "../middlewares/auth.js";
+import { requireAuth } from "../middlewares/auth.js";
 
 const router = Router();
 
-router.get("/groups", authenticate, async (req, res): Promise<void> => {
+router.get("/groups", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const categoryId = req.query.categoryId ? parseInt(req.query.categoryId as string) : null;
   
@@ -27,7 +27,7 @@ router.get("/groups", authenticate, async (req, res): Promise<void> => {
   res.json(groups);
 });
 
-router.post("/groups", authenticate, async (req, res): Promise<void> => {
+router.post("/groups", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const parsed = CreateGroupBody.safeParse(req.body);
   if (!parsed.success) {
@@ -45,7 +45,7 @@ router.post("/groups", authenticate, async (req, res): Promise<void> => {
   res.status(201).json(group);
 });
 
-router.get("/groups/:id", authenticate, async (req, res): Promise<void> => {
+router.get("/groups/:id", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const id = parseInt(req.params.id as string);
   
@@ -66,7 +66,7 @@ router.get("/groups/:id", authenticate, async (req, res): Promise<void> => {
   res.json({ ...group, items });
 });
 
-router.patch("/groups/:id", authenticate, async (req, res): Promise<void> => {
+router.patch("/groups/:id", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const id = parseInt(req.params.id as string);
   const parsed = UpdateGroupBody.safeParse(req.body);
@@ -91,7 +91,7 @@ router.patch("/groups/:id", authenticate, async (req, res): Promise<void> => {
   res.json(group);
 });
 
-router.delete("/groups/:id", authenticate, async (req, res): Promise<void> => {
+router.delete("/groups/:id", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
   const id = parseInt(req.params.id as string);
   
