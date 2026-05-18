@@ -4,5 +4,6 @@
     "rootDir": ".",
     "outDir": "../dist/api"
   },
-  "include": ["./**/*.ts"]
+  "include": ["./**/*.ts"],
+  "exclude": []
 }
