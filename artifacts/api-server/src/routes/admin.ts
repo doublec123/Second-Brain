@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { db, usersTable, knowledgeItemsTable } from "@workspace/db";
-import { eq, count } from "drizzle-orm";
+import { prisma } from "../lib/prisma.js";
 import { authenticate, isAdmin } from "../middlewares/auth.js";
 import { logger } from "../lib/logger.js";
 
@@ -11,24 +10,23 @@ const router = Router();
  */
 router.get("/users", authenticate, isAdmin, async (req, res) => {
   try {
-    const users = await db.select().from(usersTable);
-    const usersWithStats = await Promise.all(
-      users.map(async (user) => {
-        const [itemCount] = await db
-          .select({ value: count() })
-          .from(knowledgeItemsTable)
-          .where(eq(knowledgeItemsTable.userId, user.id));
-        
-        // Remove password before sending
-        const { password, ...safeUser } = user;
-        return {
-          ...safeUser,
-          stats: {
-            items: itemCount?.value || 0,
-          },
-        };
-      })
-    );
+    const users = await prisma.users.findMany({
+      include: {
+        _count: {
+          select: { knowledge_items: true }
+        }
+      }
+    });
+    const usersWithStats = users.map((user) => {
+      // Remove password before sending
+      const { password, ...safeUser } = user;
+      return {
+        ...safeUser,
+        stats: {
+          items: user._count.knowledge_items,
+        },
+      };
+    });
     res.json(usersWithStats);
   } catch (err) {
     logger.error({ err }, "Failed to fetch users for admin");
@@ -49,8 +47,8 @@ router.delete("/users/:id", authenticate, isAdmin, async (req, res): Promise<voi
 
   try {
     // Delete items first due to FK constraints (or use cascade if configured)
-    await db.delete(knowledgeItemsTable).where(eq(knowledgeItemsTable.userId, userId));
-    await db.delete(usersTable).where(eq(usersTable.id, userId));
+    await prisma.knowledge_items.deleteMany({ where: { user_id: userId } });
+    await prisma.users.delete({ where: { id: userId } });
     
     res.json({ success: true, message: `User ${userId} and all associated data deleted.` });
   } catch (err) {
@@ -64,12 +62,12 @@ router.delete("/users/:id", authenticate, isAdmin, async (req, res): Promise<voi
  */
 router.get("/stats", authenticate, isAdmin, async (req, res) => {
   try {
-    const [userCount] = await db.select({ value: count() }).from(usersTable);
-    const [itemCount] = await db.select({ value: count() }).from(knowledgeItemsTable);
+    const userCount = await prisma.users.count();
+    const itemCount = await prisma.knowledge_items.count();
     
     res.json({
-      totalUsers: userCount?.value || 0,
-      totalItems: itemCount?.value || 0,
+      totalUsers: userCount,
+      totalItems: itemCount,
     });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch system stats" });

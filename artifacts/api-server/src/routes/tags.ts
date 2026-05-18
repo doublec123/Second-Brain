@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { eq, and } from "drizzle-orm";
-import { db, tagsTable, knowledgeItemsTable } from "@workspace/db";
+import { prisma } from "../lib/prisma.js";
 import { CreateTagBody } from "@workspace/api-zod";
 import { authenticate } from "../middlewares/auth.js";
 
@@ -8,8 +7,8 @@ const router = Router();
 
 router.get("/tags", authenticate, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
-  const tags = await db.select().from(tagsTable).where(eq(tagsTable.userId, userId));
-  const items = await db.select().from(knowledgeItemsTable).where(eq(knowledgeItemsTable.userId, userId));
+  const tags = await prisma.tags.findMany({ where: { user_id: userId } });
+  const items = await prisma.knowledge_items.findMany({ where: { user_id: userId } });
 
   const result = tags.map((tag) => ({
     ...tag,
@@ -27,19 +26,24 @@ router.post("/tags", authenticate, async (req, res): Promise<void> => {
     return;
   }
 
-  const [tag] = await db
-    .insert(tagsTable)
-    .values({
-      ...parsed.data,
-      userId,
-    })
-    .onConflictDoUpdate({
-      target: [tagsTable.name, tagsTable.userId],
-      set: { color: parsed.data.color },
-    })
-    .returning();
+  const tag = await prisma.tags.upsert({
+    where: {
+      name_user_id: {
+        name: parsed.data.name,
+        user_id: userId,
+      }
+    },
+    update: {
+      color: parsed.data.color,
+    },
+    create: {
+      name: parsed.data.name,
+      color: parsed.data.color,
+      user_id: userId,
+    }
+  });
 
-  const items = await db.select().from(knowledgeItemsTable).where(eq(knowledgeItemsTable.userId, userId));
+  const items = await prisma.knowledge_items.findMany({ where: { user_id: userId } });
   const itemCount = items.filter((item) => item.tags.includes(tag.name)).length;
 
   res.status(201).json({ ...tag, itemCount });

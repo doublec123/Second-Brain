@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { eq, ilike, sql, desc, or, and } from "drizzle-orm";
-import { db, knowledgeItemsTable, tagsTable, knowledgeItemCategoriesTable, categoriesTable } from "@workspace/db";
+import { prisma } from "../lib/prisma.js";
 import {
   ListItemsQueryParams,
   CreateItemBody,
@@ -19,8 +18,34 @@ import { openai } from "@workspace/integrations-openai-ai-server";
 import { logger } from "../lib/logger.js";
 import { fetchYouTubeTranscript, isYouTubeUrl } from "../lib/youtube.js";
 import { authenticate } from "../middlewares/auth.js";
-import fs from "fs";
-import path from "path";
+
+function mapItemToCamelCase(item: any) {
+  if (!item) return item;
+  return {
+    id: item.id,
+    title: item.title,
+    sourceUrl: item.source_url,
+    sourceType: item.source_type,
+    rawContent: item.raw_content,
+    summary: item.summary,
+    structuredNotes: item.structured_notes,
+    keyConcepts: item.key_concepts ?? [],
+    tags: item.tags ?? [],
+    status: item.status,
+    createdAt: item.created_at,
+    updatedAt: item.updated_at,
+    userId: item.user_id,
+    keyPoints: item.key_points ?? [],
+    stepByStep: item.step_by_step ?? [],
+    mainConcepts: item.main_concepts ?? [],
+    difficultyLevel: item.difficulty_level,
+    isFavorite: item.is_favorite,
+    groupId: item.group_id,
+    usageCount: item.usage_count,
+    customInstructions: item.custom_instructions,
+    categories: item.categories ?? [],
+  };
+}
 
 const getSystemPrompt = (sourceType: string, categoryNames: string, customInstructions?: string) => {
   let prompt = `You are a professional knowledge extraction and technical synthesis AI. Your goal is to transform the provided content from a ${sourceType} source into high-quality, structured notes.
@@ -90,7 +115,9 @@ const router = Router();
 
 router.get("/items/stats", authenticate, async (req, res): Promise<void> => {
   const userId = (req as any).user?.id;
-  const items = await db.select().from(knowledgeItemsTable).where(eq(knowledgeItemsTable.userId, userId));
+  const items = await prisma.knowledge_items.findMany({
+    where: { user_id: userId }
+  });
 
   const byType = { link: 0, image: 0, text: 0 };
   const byStatus = { pending: 0, processing: 0, ready: 0 };
@@ -98,11 +125,11 @@ router.get("/items/stats", authenticate, async (req, res): Promise<void> => {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   for (const item of items) {
-    const t = item.sourceType as keyof typeof byType;
+    const t = item.source_type as keyof typeof byType;
     if (t in byType) byType[t]++;
     const s = item.status as keyof typeof byStatus;
     if (s in byStatus) byStatus[s]++;
-    if (item.createdAt > sevenDaysAgo) recentCount++;
+    if (item.created_at > sevenDaysAgo) recentCount++;
   }
 
   res.json({ total: items.length, byType, byStatus, recentCount });
@@ -140,16 +167,15 @@ router.get("/items/search", authenticate, async (req, res): Promise<void> => {
       searchTerms = [q];
     }
 
-    const allItems = await db
-      .select()
-      .from(knowledgeItemsTable)
-      .where(eq(knowledgeItemsTable.userId, userId))
-      .orderBy(desc(knowledgeItemsTable.createdAt));
+    const allItems = await prisma.knowledge_items.findMany({
+      where: { user_id: userId },
+      orderBy: { created_at: "desc" }
+    });
 
     const scored = allItems
       .map((item) => {
         const text =
-          `${item.title} ${item.summary ?? ""} ${item.structuredNotes ?? ""} ${item.keyConcepts.join(" ")} ${item.tags.join(" ")}`.toLowerCase();
+          `${item.title} ${item.summary ?? ""} ${item.structured_notes ?? ""} ${(item.key_concepts ?? []).join(" ")} ${(item.tags ?? []).join(" ")}`.toLowerCase();
         const score = searchTerms.reduce((acc, term) => {
           return acc + (text.includes(term.toLowerCase()) ? 1 : 0);
         }, 0);
@@ -159,23 +185,20 @@ router.get("/items/search", authenticate, async (req, res): Promise<void> => {
       .sort((a, b) => b.score - a.score)
       .map((r) => r.item);
 
-    res.json(scored);
+    res.json(scored.map(mapItemToCamelCase));
   } catch (err) {
     logger.error({ err }, "Semantic search error");
-    const fallback = await db
-      .select()
-      .from(knowledgeItemsTable)
-      .where(
-        and(
-          eq(knowledgeItemsTable.userId, userId),
-          or(
-            ilike(knowledgeItemsTable.title, `%${q}%`),
-            ilike(knowledgeItemsTable.summary ?? sql`''`, `%${q}%`)
-          )
-        )
-      )
-      .limit(20);
-    res.json(fallback);
+    const fallback = await prisma.knowledge_items.findMany({
+      where: {
+        user_id: userId,
+        OR: [
+          { title: { contains: q, mode: "insensitive" } },
+          { summary: { contains: q, mode: "insensitive" } }
+        ]
+      },
+      take: 20
+    });
+    res.json(fallback.map(mapItemToCamelCase));
   }
 });
 
@@ -190,28 +213,20 @@ router.get("/items", authenticate, async (req, res): Promise<void> => {
   const parsedData = parsed.data as any;
   const { q, type, tag, status, isFavorite, groupId, categoryId } = parsedData;
 
-  const baseQuery = db
-    .selectDistinct({
-      item: knowledgeItemsTable,
-    })
-    .from(knowledgeItemsTable);
-
-  const finalQuery = categoryId
-    ? baseQuery
-        .innerJoin(
-          knowledgeItemCategoriesTable,
-          eq(knowledgeItemsTable.id, knowledgeItemCategoriesTable.itemId)
-        )
-        .where(
-          and(
-            eq(knowledgeItemsTable.userId, userId),
-            eq(knowledgeItemCategoriesTable.categoryId, categoryId)
-          )
-        )
-    : baseQuery.where(eq(knowledgeItemsTable.userId, userId));
-
-  const itemsWithMeta = await finalQuery.orderBy(desc(knowledgeItemsTable.createdAt));
-  let items = itemsWithMeta.map(r => r.item);
+  let items: any[] = [];
+  if (categoryId) {
+    const relations = await prisma.knowledge_item_categories.findMany({
+      where: { category_id: categoryId, knowledge_items: { user_id: userId } },
+      include: { knowledge_items: true },
+      orderBy: { knowledge_items: { created_at: "desc" } }
+    });
+    items = relations.map(r => r.knowledge_items);
+  } else {
+    items = await prisma.knowledge_items.findMany({
+      where: { user_id: userId },
+      orderBy: { created_at: "desc" }
+    });
+  }
 
   if (q) {
     const lower = q.toLowerCase();
@@ -219,40 +234,36 @@ router.get("/items", authenticate, async (req, res): Promise<void> => {
       (item) =>
         item.title.toLowerCase().includes(lower) ||
         (item.summary ?? "").toLowerCase().includes(lower) ||
-        item.keyConcepts.some((c) => c.toLowerCase().includes(lower)) ||
-        item.tags.some((t) => t.toLowerCase().includes(lower))
+        (item.key_concepts ?? []).some((c: string) => c.toLowerCase().includes(lower)) ||
+        (item.tags ?? []).some((t: string) => t.toLowerCase().includes(lower))
     );
   }
 
-  if (type) items = items.filter((item) => item.sourceType === type);
-  if (tag) items = items.filter((item) => item.tags.includes(tag));
+  if (type) items = items.filter((item) => item.source_type === type);
+  if (tag) items = items.filter((item) => (item.tags ?? []).includes(tag));
   if (status) items = items.filter((item) => item.status === status);
-  if (isFavorite !== undefined) items = items.filter((item) => item.isFavorite === isFavorite);
-  if (groupId) items = items.filter((item) => item.groupId === groupId);
+  if (isFavorite !== undefined) items = items.filter((item) => item.is_favorite === isFavorite);
+  if (groupId) items = items.filter((item) => item.group_id === groupId);
 
   // Attach categories to items
   const itemIds = items.map(i => i.id);
   if (itemIds.length > 0) {
-    const allItemCategories = await db
-      .select({
-        itemId: knowledgeItemCategoriesTable.itemId,
-        categoryName: categoriesTable.name,
-      })
-      .from(knowledgeItemCategoriesTable)
-      .innerJoin(categoriesTable, eq(knowledgeItemCategoriesTable.categoryId, categoriesTable.id))
-      .where(sql`${knowledgeItemCategoriesTable.itemId} IN ${itemIds}`);
+    const allItemCategories = await prisma.knowledge_item_categories.findMany({
+      where: { item_id: { in: itemIds } },
+      include: { categories: true }
+    });
 
     items = items.map(item => ({
       ...item,
       categories: allItemCategories
-        .filter(c => c.itemId === item.id)
-        .map(c => c.categoryName)
+        .filter(c => c.item_id === item.id)
+        .map(c => c.categories.name)
     }));
   } else {
     items = items.map(item => ({ ...item, categories: [] }));
   }
 
-  res.json(items);
+  res.json(items.map(mapItemToCamelCase));
 });
 
 router.post("/items", authenticate, async (req, res): Promise<void> => {
@@ -294,7 +305,7 @@ router.post("/items", authenticate, async (req, res): Promise<void> => {
     }
   }
 
-  const categories = await db.select().from(categoriesTable).where(eq(categoriesTable.userId, userId));
+  const categories = await prisma.categories.findMany({ where: { user_id: userId } });
   const categoryNames = categories.map(c => c.name).join(", ");
   
   let parsedNotes: any = {};
@@ -334,52 +345,55 @@ router.post("/items", authenticate, async (req, res): Promise<void> => {
     }
   }
 
-  const [item] = await db
-    .insert(knowledgeItemsTable)
-    .values({
-      userId,
+  const item = await prisma.knowledge_items.create({
+    data: {
+      user_id: userId,
       title,
-      sourceUrl: parsed.data.sourceUrl ?? null,
-      sourceType: sourceType as any,
-      rawContent: sourceType === "image" ? null : rawContent,
+      source_url: parsed.data.sourceUrl ?? null,
+      source_type: sourceType as any,
+      raw_content: sourceType === "image" ? null : rawContent,
       tags: parsed.data.tags ?? [],
-      groupId: (parsed.data as any).groupId ?? null,
+      group_id: (parsed.data as any).groupId ?? null,
       status: finalStatus,
       summary: parsedNotes.summary ?? null,
-      structuredNotes: parsedNotes.structuredNotes ?? null,
-      keyPoints: parsedNotes.keyPoints ?? [],
-      stepByStep: parsedNotes.stepByStep ?? [],
-      mainConcepts: parsedNotes.mainConcepts ?? [],
-      difficultyLevel: parsedNotes.difficultyLevel ?? null,
-      keyConcepts: parsedNotes.keyConcepts ?? [],
-      customInstructions: customInstructions,
-    })
-    .returning();
+      structured_notes: parsedNotes.structuredNotes ?? null,
+      key_points: parsedNotes.keyPoints ?? [],
+      step_by_step: parsedNotes.stepByStep ?? [],
+      main_concepts: parsedNotes.mainConcepts ?? [],
+      difficulty_level: parsedNotes.difficultyLevel ?? null,
+      key_concepts: parsedNotes.keyConcepts ?? [],
+      custom_instructions: customInstructions,
+    }
+  });
 
   if ((parsed.data as any).categoryIds && (parsed.data as any).categoryIds.length > 0) {
-    await db.insert(knowledgeItemCategoriesTable).values(
-      (parsed.data as any).categoryIds.map((catId: number) => ({
-        itemId: item.id,
-        categoryId: catId
+    await prisma.knowledge_item_categories.createMany({
+      data: (parsed.data as any).categoryIds.map((catId: number) => ({
+        item_id: item.id,
+        category_id: catId
       }))
-    );
+    });
   }
 
   if (parsedNotes.suggestedCategories && parsedNotes.suggestedCategories.length > 0) {
     for (const catName of parsedNotes.suggestedCategories) {
       let cat = categories.find(c => c.name.toLowerCase() === catName.toLowerCase());
       if (!cat) {
-        [cat] = await db.insert(categoriesTable).values({ name: catName, userId }).returning();
+        cat = await prisma.categories.create({
+          data: { name: catName, user_id: userId }
+        });
       }
       if (cat) {
-        await db.insert(knowledgeItemCategoriesTable)
-          .values({ itemId: item.id, categoryId: cat.id })
-          .onConflictDoNothing();
+        try {
+          await prisma.knowledge_item_categories.create({
+            data: { item_id: item.id, category_id: cat.id }
+          });
+        } catch { /* ignore conflict */ }
       }
     }
   }
 
-  res.status(201).json(item);
+  res.status(201).json(mapItemToCamelCase(item));
 });
 
 router.get("/items/:id", authenticate, async (req, res): Promise<void> => {
@@ -390,17 +404,16 @@ router.get("/items/:id", authenticate, async (req, res): Promise<void> => {
     return;
   }
 
-  const [item] = await db
-    .select()
-    .from(knowledgeItemsTable)
-    .where(and(eq(knowledgeItemsTable.id, params.data.id), eq(knowledgeItemsTable.userId, userId)));
+  const item = await prisma.knowledge_items.findFirst({
+    where: { id: params.data.id, user_id: userId }
+  });
 
   if (!item) {
     res.status(404).json({ error: "Item not found" });
     return;
   }
 
-  res.json(item);
+  res.json(mapItemToCamelCase(item));
 });
 
 router.patch("/items/:id", authenticate, async (req, res): Promise<void> => {
@@ -422,23 +435,25 @@ router.patch("/items/:id", authenticate, async (req, res): Promise<void> => {
   if (parsed.data.tags !== undefined) updateData.tags = parsed.data.tags;
   if (parsed.data.summary !== undefined) updateData.summary = parsed.data.summary;
   if (parsed.data.structuredNotes !== undefined)
-    updateData.structuredNotes = parsed.data.structuredNotes;
-  if ((parsed.data as any).isFavorite !== undefined) updateData.isFavorite = (parsed.data as any).isFavorite;
-  if ((parsed.data as any).groupId !== undefined) updateData.groupId = (parsed.data as any).groupId;
-  if ((parsed.data as any).customInstructions !== undefined) updateData.customInstructions = (parsed.data as any).customInstructions;
+    updateData.structured_notes = parsed.data.structuredNotes;
+  if ((parsed.data as any).isFavorite !== undefined) updateData.is_favorite = (parsed.data as any).isFavorite;
+  if ((parsed.data as any).groupId !== undefined) updateData.group_id = (parsed.data as any).groupId;
+  if ((parsed.data as any).customInstructions !== undefined) updateData.custom_instructions = (parsed.data as any).customInstructions;
 
-  const [item] = await db
-    .update(knowledgeItemsTable)
-    .set(updateData)
-    .where(and(eq(knowledgeItemsTable.id, params.data.id), eq(knowledgeItemsTable.userId, userId)))
-    .returning();
-
-  if (!item) {
+  const itemCheck = await prisma.knowledge_items.findFirst({
+    where: { id: params.data.id, user_id: userId }
+  });
+  if (!itemCheck) {
     res.status(404).json({ error: "Item not found" });
     return;
   }
 
-  res.json(item);
+  const item = await prisma.knowledge_items.update({
+    where: { id: params.data.id },
+    data: updateData
+  });
+
+  res.json(mapItemToCamelCase(item));
 });
 
 router.delete("/items/:id", authenticate, async (req, res): Promise<void> => {
@@ -449,15 +464,18 @@ router.delete("/items/:id", authenticate, async (req, res): Promise<void> => {
     return;
   }
 
-  const [item] = await db
-    .delete(knowledgeItemsTable)
-    .where(and(eq(knowledgeItemsTable.id, params.data.id), eq(knowledgeItemsTable.userId, userId)))
-    .returning();
+  const item = await prisma.knowledge_items.findFirst({
+    where: { id: params.data.id, user_id: userId }
+  });
 
   if (!item) {
     res.status(404).json({ error: "Item not found" });
     return;
   }
+
+  await prisma.knowledge_items.delete({
+    where: { id: params.data.id }
+  });
 
   res.sendStatus(204);
 });
@@ -470,35 +488,34 @@ router.post("/items/:id/process", authenticate, async (req, res): Promise<void> 
     return;
   }
 
-  const [item] = await db
-    .select()
-    .from(knowledgeItemsTable)
-    .where(and(eq(knowledgeItemsTable.id, params.data.id), eq(knowledgeItemsTable.userId, userId)));
+  const item = await prisma.knowledge_items.findFirst({
+    where: { id: params.data.id, user_id: userId }
+  });
 
   if (!item) {
     res.status(404).json({ error: "Item not found" });
     return;
   }
 
-  await db
-    .update(knowledgeItemsTable)
-    .set({ status: "processing" })
-    .where(eq(knowledgeItemsTable.id, item.id));
+  await prisma.knowledge_items.update({
+    where: { id: item.id },
+    data: { status: "processing" }
+  });
 
-  const categories = await db.select().from(categoriesTable).where(eq(categoriesTable.userId, userId));
+  const categories = await prisma.categories.findMany({ where: { user_id: userId } });
   const categoryNames = categories.map(c => c.name).join(", ");
 
-  if (item.sourceType === "image" && !item.rawContent) {
+  if (item.source_type === "image" && !item.raw_content) {
     res.status(400).json({ error: "Image data was not saved. Please re-capture the image to re-analyze." });
     return;
   }
 
-  const systemPrompt = getSystemPrompt(item.sourceType, categoryNames, item.customInstructions ?? undefined);
+  const systemPrompt = getSystemPrompt(item.source_type, categoryNames, item.custom_instructions ?? undefined);
 
   try {
     let response;
 
-    const contentToProcess = item.rawContent ?? item.sourceUrl ?? item.title;
+    const contentToProcess = item.raw_content ?? item.source_url ?? item.title;
     response = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL_CHAT || "openai/gpt-4o-mini",
       max_completion_tokens: 4096,
@@ -506,7 +523,7 @@ router.post("/items/:id/process", authenticate, async (req, res): Promise<void> 
         { role: "system", content: systemPrompt },
         {
           role: "user",
-          content: `Title: ${item.title}\nSource type: ${item.sourceType}\nContent: ${contentToProcess?.substring(0, 8000) ?? "(no content)"}`,
+          content: `Title: ${item.title}\nSource type: ${item.source_type}\nContent: ${contentToProcess?.substring(0, 8000) ?? "(no content)"}`,
         },
       ],
     });
@@ -525,38 +542,41 @@ router.post("/items/:id/process", authenticate, async (req, res): Promise<void> 
       for (const catName of parsed.suggestedCategories) {
         let cat = categories.find(c => c.name.toLowerCase() === catName.toLowerCase());
         if (!cat) {
-          [cat] = await db.insert(categoriesTable).values({ name: catName, userId }).returning();
+          cat = await prisma.categories.create({
+            data: { name: catName, user_id: userId }
+          });
         }
         if (cat) {
-          await db.insert(knowledgeItemCategoriesTable)
-            .values({ itemId: item.id, categoryId: cat.id })
-            .onConflictDoNothing();
+          try {
+            await prisma.knowledge_item_categories.create({
+              data: { item_id: item.id, category_id: cat.id }
+            });
+          } catch { /* ignore conflict */ }
         }
       }
     }
 
-    const [updated] = await db
-      .update(knowledgeItemsTable)
-      .set({
+    const updated = await prisma.knowledge_items.update({
+      where: { id: item.id },
+      data: {
         summary: parsed.summary ?? null,
-        structuredNotes: parsed.structuredNotes ?? null,
-        keyPoints: parsed.keyPoints ?? [],
-        stepByStep: parsed.stepByStep ?? [],
-        mainConcepts: parsed.mainConcepts ?? [],
-        difficultyLevel: parsed.difficultyLevel ?? null,
-        keyConcepts: parsed.keyConcepts ?? [],
+        structured_notes: parsed.structuredNotes ?? null,
+        key_points: parsed.keyPoints ?? [],
+        step_by_step: parsed.stepByStep ?? [],
+        main_concepts: parsed.mainConcepts ?? [],
+        difficulty_level: parsed.difficultyLevel ?? null,
+        key_concepts: parsed.keyConcepts ?? [],
         status: "ready",
-      })
-      .where(eq(knowledgeItemsTable.id, item.id))
-      .returning();
+      }
+    });
 
-    res.json(updated);
+    res.json(mapItemToCamelCase(updated));
   } catch (err) {
     logger.error({ err }, "AI processing failed");
-    await db
-      .update(knowledgeItemsTable)
-      .set({ status: "pending" })
-      .where(eq(knowledgeItemsTable.id, item.id));
+    await prisma.knowledge_items.update({
+      where: { id: item.id },
+      data: { status: "pending" }
+    });
     res.status(500).json({ error: "AI processing failed" });
   }
 });
@@ -575,10 +595,9 @@ router.post("/items/:id/generate-guide", authenticate, async (req, res): Promise
     return;
   }
 
-  const [item] = await db
-    .select()
-    .from(knowledgeItemsTable)
-    .where(and(eq(knowledgeItemsTable.id, params.data.id), eq(knowledgeItemsTable.userId, userId)));
+  const item = await prisma.knowledge_items.findFirst({
+    where: { id: params.data.id, user_id: userId }
+  });
 
   if (!item) {
     res.status(404).json({ error: "Item not found" });
@@ -614,9 +633,9 @@ Respond ONLY with valid JSON in this exact format:
         role: "user",
         content: `Title: ${item.title}
 Summary: ${item.summary ?? ""}
-Structured Notes: ${item.structuredNotes ?? ""}
-Key Concepts: ${item.keyConcepts.join(", ")}
-Custom Instructions: ${item.customInstructions ?? "None"}
+Structured Notes: ${item.structured_notes ?? ""}
+Key Concepts: ${(item.key_concepts ?? []).join(", ")}
+Custom Instructions: ${item.custom_instructions ?? "None"}
 Guide Type: ${parsed.data.guideType}`,
       },
     ],
@@ -651,34 +670,35 @@ router.get("/items/:id/related", authenticate, async (req, res): Promise<void> =
     return;
   }
 
-  const [item] = await db
-    .select()
-    .from(knowledgeItemsTable)
-    .where(and(eq(knowledgeItemsTable.id, params.data.id), eq(knowledgeItemsTable.userId, userId)));
+  const item = await prisma.knowledge_items.findFirst({
+    where: { id: params.data.id, user_id: userId }
+  });
 
   if (!item) {
     res.json([]);
     return;
   }
 
-  const allItems = await db
-    .select()
-    .from(knowledgeItemsTable)
-    .where(and(sql`${knowledgeItemsTable.id} != ${params.data.id}`, eq(knowledgeItemsTable.userId, userId)))
-    .orderBy(desc(knowledgeItemsTable.createdAt));
+  const allItems = await prisma.knowledge_items.findMany({
+    where: {
+      id: { not: params.data.id },
+      user_id: userId
+    },
+    orderBy: { created_at: "desc" }
+  });
 
   const related = allItems
     .map((other) => {
       const sharedTags = item.tags.filter((t) => other.tags.includes(t)).length;
-      const sharedConcepts = item.keyConcepts.filter((c) =>
-        other.keyConcepts.includes(c)
+      const sharedConcepts = item.key_concepts.filter((c) =>
+        other.key_concepts.includes(c)
       ).length;
       return { item: other, score: sharedTags * 2 + sharedConcepts };
     })
     .filter((r) => r.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, 5)
-    .map((r) => r.item);
+    .map((r) => mapItemToCamelCase(r.item));
 
   res.json(related);
 });
@@ -691,10 +711,9 @@ router.post("/items/:id/export", authenticate, async (req, res): Promise<void> =
     return;
   }
 
-  const [item] = await db
-    .select()
-    .from(knowledgeItemsTable)
-    .where(and(eq(knowledgeItemsTable.id, params.data.id), eq(knowledgeItemsTable.userId, userId)));
+  const item = await prisma.knowledge_items.findFirst({
+    where: { id: params.data.id, user_id: userId }
+  });
 
   if (!item) {
     res.status(404).json({ error: "Item not found" });
@@ -703,9 +722,9 @@ router.post("/items/:id/export", authenticate, async (req, res): Promise<void> =
 
   const content = `# ${item.title}
 
-**Source Type:** ${item.sourceType}
-${item.sourceUrl ? `**Source URL:** ${item.sourceUrl}` : ""}
-**Captured:** ${item.createdAt.toLocaleDateString()}
+**Source Type:** ${item.source_type}
+${item.source_url ? `**Source URL:** ${item.source_url}` : ""}
+**Captured:** ${item.created_at.toLocaleDateString()}
 
 ---
 
@@ -717,13 +736,13 @@ ${item.summary ?? "_Not yet processed_"}
 
 ## Structured Notes
 
-${item.structuredNotes ?? "_Not yet processed_"}
+${item.structured_notes ?? "_Not yet processed_"}
 
 ---
 
 ## Key Concepts
 
-${item.keyConcepts.map((c) => `- ${c}`).join("\n") || "_None identified yet_"}
+${item.key_concepts.map((c: string) => `- ${c}`).join("\n") || "_None identified yet_"}
 
 ---
 
@@ -742,4 +761,3 @@ ${item.tags.join(", ") || "_No tags_"}
 });
 
 export default router;
-;

@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { eq, and } from "drizzle-orm";
-import { db, personalNotesTable, knowledgeItemsTable } from "@workspace/db";
+import { prisma } from "../lib/prisma.js";
 import { authenticate } from "../middlewares/auth.js";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { logger } from "../lib/logger.js";
@@ -13,20 +12,18 @@ router.get("/items/:id/notes", authenticate, async (req, res): Promise<void> => 
   const itemId = parseInt(req.params.id as string);
 
   // Verify item belongs to user
-  const [item] = await db
-    .select()
-    .from(knowledgeItemsTable)
-    .where(and(eq(knowledgeItemsTable.id, itemId), eq(knowledgeItemsTable.userId, userId)));
+  const item = await prisma.knowledge_items.findFirst({
+    where: { id: itemId, user_id: userId }
+  });
 
   if (!item) {
     return void res.status(404).json({ error: "Item not found" });
   }
 
-  const notes = await db
-    .select()
-    .from(personalNotesTable)
-    .where(eq(personalNotesTable.itemId, itemId))
-    .orderBy(personalNotesTable.createdAt);
+  const notes = await prisma.personal_notes.findMany({
+    where: { item_id: itemId },
+    orderBy: { created_at: "asc" }
+  });
 
   return void res.json(notes);
 });
@@ -38,25 +35,23 @@ router.post("/items/:id/notes", authenticate, async (req, res): Promise<void> =>
   const { type, format, target, content } = req.body;
 
   // Verify item belongs to user
-  const [item] = await db
-    .select()
-    .from(knowledgeItemsTable)
-    .where(and(eq(knowledgeItemsTable.id, itemId), eq(knowledgeItemsTable.userId, userId)));
+  const item = await prisma.knowledge_items.findFirst({
+    where: { id: itemId, user_id: userId }
+  });
 
   if (!item) {
     return void res.status(404).json({ error: "Item not found" });
   }
 
-  const [note] = await db
-    .insert(personalNotesTable)
-    .values({
-      itemId,
+  const note = await prisma.personal_notes.create({
+    data: {
+      item_id: itemId,
       type,
       format,
       target,
       content,
-    })
-    .returning();
+    }
+  });
 
   return void res.status(201).json(note);
 });
@@ -68,24 +63,28 @@ router.patch("/notes/:id", authenticate, async (req, res): Promise<void> => {
   const { type, format, target, content } = req.body;
 
   // Verify note belongs to user's item
-  const [noteWithUser] = await db
-    .select({
-      note: personalNotesTable,
-      item: knowledgeItemsTable,
-    })
-    .from(personalNotesTable)
-    .innerJoin(knowledgeItemsTable, eq(personalNotesTable.itemId, knowledgeItemsTable.id))
-    .where(and(eq(personalNotesTable.id, noteId), eq(knowledgeItemsTable.userId, userId)));
+  const note = await prisma.personal_notes.findFirst({
+    where: {
+      id: noteId,
+      knowledge_items: {
+        user_id: userId
+      }
+    },
+    include: {
+      knowledge_items: true
+    }
+  });
+
+  const noteWithUser = note ? { note, item: note.knowledge_items } : null;
 
   if (!noteWithUser) {
     return void res.status(404).json({ error: "Note not found" });
   }
 
-  const [updatedNote] = await db
-    .update(personalNotesTable)
-    .set({ type, format, target, content })
-    .where(eq(personalNotesTable.id, noteId))
-    .returning();
+  const updatedNote = await prisma.personal_notes.update({
+    where: { id: noteId },
+    data: { type, format, target, content }
+  });
 
   return void res.json(updatedNote);
 });
@@ -96,20 +95,25 @@ router.delete("/notes/:id", authenticate, async (req, res): Promise<void> => {
   const noteId = parseInt(req.params.id as string);
 
   // Verify note belongs to user's item
-  const [noteWithUser] = await db
-    .select({
-      note: personalNotesTable,
-      item: knowledgeItemsTable,
-    })
-    .from(personalNotesTable)
-    .innerJoin(knowledgeItemsTable, eq(personalNotesTable.itemId, knowledgeItemsTable.id))
-    .where(and(eq(personalNotesTable.id, noteId), eq(knowledgeItemsTable.userId, userId)));
+  const note = await prisma.personal_notes.findFirst({
+    where: {
+      id: noteId,
+      knowledge_items: {
+        user_id: userId
+      }
+    },
+    include: {
+      knowledge_items: true
+    }
+  });
+
+  const noteWithUser = note ? { note, item: note.knowledge_items } : null;
 
   if (!noteWithUser) {
     return void res.status(404).json({ error: "Note not found" });
   }
 
-  await db.delete(personalNotesTable).where(eq(personalNotesTable.id, noteId));
+  await prisma.personal_notes.delete({ where: { id: noteId } });
   return void res.sendStatus(204);
 });
 
@@ -118,14 +122,19 @@ router.post("/notes/:id/enhance", authenticate, async (req, res): Promise<void> 
   const userId = (req as any).user?.id;
   const noteId = parseInt(req.params.id as string);
 
-  const [noteWithUser] = await db
-    .select({
-      note: personalNotesTable,
-      item: knowledgeItemsTable,
-    })
-    .from(personalNotesTable)
-    .innerJoin(knowledgeItemsTable, eq(personalNotesTable.itemId, knowledgeItemsTable.id))
-    .where(and(eq(personalNotesTable.id, noteId), eq(knowledgeItemsTable.userId, userId)));
+  const note = await prisma.personal_notes.findFirst({
+    where: {
+      id: noteId,
+      knowledge_items: {
+        user_id: userId
+      }
+    },
+    include: {
+      knowledge_items: true
+    }
+  });
+
+  const noteWithUser = note ? { note, item: note.knowledge_items } : null;
 
   if (!noteWithUser) {
     return void res.status(404).json({ error: "Note not found" });
@@ -153,11 +162,10 @@ router.post("/notes/:id/enhance", authenticate, async (req, res): Promise<void> 
 
     const enhancedContent = response.choices[0]?.message?.content ?? content;
 
-    const [updatedNote] = await db
-      .update(personalNotesTable)
-      .set({ content: enhancedContent })
-      .where(eq(personalNotesTable.id, noteId))
-      .returning();
+    const updatedNote = await prisma.personal_notes.update({
+      where: { id: noteId },
+      data: { content: enhancedContent }
+    });
 
     res.json(updatedNote);
   } catch (err) {

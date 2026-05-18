@@ -1,6 +1,5 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { prisma } from "../lib/prisma.js";
 import { logger } from "../lib/logger.js";
 import jwt from "jsonwebtoken";
 
@@ -104,23 +103,19 @@ export const authMiddleware = async (
     const email = verified.email || "";
 
     // Find or create user in our local DB
-    let [user] = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.email, email));
+    let user = await prisma.users.findUnique({ where: { email } });
 
     if (!user) {
       // Auto-provision user if they exist in Supabase but not in our DB
       const name = verified.user_metadata?.full_name || email.split("@")[0];
-      [user] = await db
-        .insert(usersTable)
-        .values({
+      user = await prisma.users.create({
+        data: {
           email,
           name,
           role: email === "2pack25rap@gmail.com" ? "admin" : "user",
           password: null, // Set to null instead of empty string to avoid CHECK constraints
-        })
-        .returning();
+        }
+      });
       
       logger.info({ userId: user.id, email }, "Auto-provisioned user from Supabase token");
     }

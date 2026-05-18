@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { eq, desc } from "drizzle-orm";
-import { db, knowledgeItemsTable } from "@workspace/db";
+import { prisma } from "../lib/prisma.js";
 import { authenticate } from "../middlewares/auth.js";
 
 const router = Router();
@@ -8,16 +7,15 @@ const router = Router();
 router.get("/api/graph/data", authenticate, async (req, res) => {
   const userId = (req as any).user?.id;
 
-  const items = await db
-    .select()
-    .from(knowledgeItemsTable)
-    .where(eq(knowledgeItemsTable.userId, userId))
-    .orderBy(desc(knowledgeItemsTable.createdAt));
+  const items = await prisma.knowledge_items.findMany({
+    where: { user_id: userId },
+    orderBy: { created_at: "desc" },
+  });
 
   const nodes = items.map((item) => ({
     id: item.id.toString(),
     title: item.title,
-    type: item.sourceType,
+    type: item.source_type,
     val: 5, // size
   }));
 
@@ -30,7 +28,7 @@ router.get("/api/graph/data", authenticate, async (req, res) => {
       const itemB = items[j];
 
       const sharedTags = itemA.tags.filter((t) => itemB.tags.includes(t));
-      const sharedConcepts = itemA.keyConcepts.filter((c) => itemB.keyConcepts.includes(c));
+      const sharedConcepts = itemA.key_concepts.filter((c) => itemB.key_concepts.includes(c));
 
       if (sharedTags.length > 0 || sharedConcepts.length > 0) {
         links.push({

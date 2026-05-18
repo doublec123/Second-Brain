@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model categories {
+  id                        Int                         @id @default(autoincrement())
+  user_id                   Int?
+  name                      String
+  icon                      String?                     @db.VarChar(50)
+  description               String?
+  color                     String                      @default("#6366f1") @db.VarChar(20)
+  users                     users?                      @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "categories_user_id_users_id_fk")
+  knowledge_item_categories knowledge_item_categories[]
+  note_groups               note_groups[]
+
+  @@unique([name, user_id], map: "categories_name_user_idx")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model conversations {
+  id         Int        @id @default(autoincrement())
+  title      String
+  created_at DateTime   @default(now()) @db.Timestamptz(6)
+  messages   messages[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model knowledge_item_categories {
+  item_id         Int
+  category_id     Int
+  categories      categories      @relation(fields: [category_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "knowledge_item_categories_category_id_categories_id_fk")
+  knowledge_items knowledge_items @relation(fields: [item_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "knowledge_item_categories_item_id_knowledge_items_id_fk")
+
+  @@id([item_id, category_id], map: "knowledge_item_categories_item_id_category_id_pk")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model knowledge_items {
+  id                        Int                         @id @default(autoincrement())
+  title                     String
+  source_url                String?
+  source_type               String                      @default("text") @db.VarChar(20)
+  raw_content               String?
+  summary                   String?
+  structured_notes          String?
+  key_concepts              String[]                    @default([])
+  tags                      String[]                    @default([])
+  status                    String                      @default("pending") @db.VarChar(20)
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  user_id                   Int?
+  key_points                String[]                    @default([])
+  step_by_step              String[]                    @default([])
+  main_concepts             String[]                    @default([])
+  difficulty_level          String?                     @db.VarChar(20)
+  is_favorite               Boolean                     @default(false)
+  group_id                  Int?
+  usage_count               Int                         @default(0)
+  custom_instructions       String?
+  knowledge_item_categories knowledge_item_categories[]
+  users                     users?                      @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "knowledge_items_user_id_users_id_fk")
+  personal_notes            personal_notes[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model messages {
+  id              Int           @id @default(autoincrement())
+  conversation_id Int
+  role            String
+  content         String
+  created_at      DateTime      @default(now()) @db.Timestamptz(6)
+  conversations   conversations @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "messages_conversation_id_conversations_id_fk")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model note_groups {
+  id          Int         @id @default(autoincrement())
+  user_id     Int?
+  title       String
+  description String?
+  category_id Int?
+  created_at  DateTime    @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime    @default(now()) @db.Timestamptz(6)
+  categories  categories? @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "note_groups_category_id_categories_id_fk")
+  users       users?      @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "note_groups_user_id_users_id_fk")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model personal_notes {
+  id              Int             @id @default(autoincrement())
+  item_id         Int
+  type            String          @default("general") @db.VarChar(50)
+  format          String          @default("plain") @db.VarChar(20)
+  target          String          @default("item") @db.VarChar(50)
+  content         String
+  created_at      DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime        @default(now()) @db.Timestamptz(6)
+  knowledge_items knowledge_items @relation(fields: [item_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "personal_notes_item_id_knowledge_items_id_fk")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tags {
+  id      Int    @id @default(autoincrement())
+  name    String
+  color   String @default("#6366f1")
+  user_id Int?
+  users   users? @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "tags_user_id_users_id_fk")
+
+  @@unique([name, user_id], map: "tags_name_user_idx")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model users {
+  id              Int               @id @default(autoincrement())
+  email           String            @unique(map: "users_email_unique")
+  password        String?
+  name            String?
+  google_id       String?           @unique(map: "users_google_id_unique")
+  avatar_url      String?
+  role            String            @default("user") @db.VarChar(20)
+  created_at      DateTime          @default(now()) @db.Timestamp(6)
+  updated_at      DateTime          @default(now()) @db.Timestamp(6)
+  categories      categories[]
+  knowledge_items knowledge_items[]
+  note_groups     note_groups[]
+  tags            tags[]
+}

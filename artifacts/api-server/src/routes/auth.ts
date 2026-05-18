@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { prisma } from "../lib/prisma.js";
 import { logger } from "../lib/logger.js";
 import jwt from "jsonwebtoken";
 
@@ -19,19 +18,17 @@ router.post("/login", async (req, res): Promise<void> => {
   try {
     // Hardcoded Admin check — auto-creates account if missing
     if (email === "2pack25rap@gmail.com" && password === "123vive$$") {
-      let [user] = await db.select().from(usersTable).where(eq(usersTable.email, email));
+      let user = await prisma.users.findUnique({ where: { email } });
       if (!user) {
-        [user] = await db
-          .insert(usersTable)
-          .values({ email, password, name: "Admin", role: "admin" })
-          .returning();
+        user = await prisma.users.create({
+          data: { email, password, name: "Admin", role: "admin" }
+        });
       } else if (user.role !== "admin") {
         // Ensure the role is correct even if account was created as user
-        [user] = await db
-          .update(usersTable)
-          .set({ role: "admin" })
-          .where(eq(usersTable.id, user.id))
-          .returning();
+        user = await prisma.users.update({
+          where: { id: user.id },
+          data: { role: "admin" }
+        });
       }
 
       (req as any).session.userId = user.id;
@@ -43,7 +40,7 @@ router.post("/login", async (req, res): Promise<void> => {
     }
 
     // Normal user login
-    const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email));
+    const user = await prisma.users.findUnique({ where: { email } });
     if (!user || user.password !== password) {
       res.status(401).json({ error: "Invalid email or password" });
       return;
@@ -73,21 +70,20 @@ router.post("/signup", async (req, res): Promise<void> => {
   }
 
   try {
-    const [existing] = await db.select().from(usersTable).where(eq(usersTable.email, email));
+    const existing = await prisma.users.findUnique({ where: { email } });
     if (existing) {
       res.status(400).json({ error: "An account with that email already exists" });
       return;
     }
 
-    const [user] = await db
-      .insert(usersTable)
-      .values({
+    const user = await prisma.users.create({
+      data: {
         email,
         password,
         name: name || email.split("@")[0],
         role: "user",
-      })
-      .returning();
+      }
+    });
 
     (req as any).session.userId = user.id;
     (req as any).session.userRole = user.role;

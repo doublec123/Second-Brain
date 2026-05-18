@@ -1,6 +1,5 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
-import { db, usersTable, knowledgeItemsTable, categoriesTable, tagsTable, noteGroupsTable } from "@workspace/db";
-import { eq, isNull } from "drizzle-orm";
+import { prisma } from "../lib/prisma.js";
 import { logger } from "../lib/logger.js";
 import jwt from "jsonwebtoken";
 
@@ -76,7 +75,7 @@ export const authMiddleware = async (
     const userId = (req as any).session?.userId;
     if (userId) {
       try {
-        const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+        const user = await prisma.users.findUnique({ where: { id: userId } });
         if (user) {
           const parsedId = typeof user.id === "string" ? parseInt(user.id, 10) : user.id;
           req.user = {
@@ -122,23 +121,19 @@ export const authMiddleware = async (
     const email = verified.email || "";
 
     // Find or create user in our local DB
-    let [user] = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.email, email));
+    let user = await prisma.users.findUnique({ where: { email } });
 
     if (!user) {
       // Auto-provision user if they exist in Supabase but not in our DB
       const name = verified.user_metadata?.full_name || email.split("@")[0];
-      [user] = await db
-        .insert(usersTable)
-        .values({
+      user = await prisma.users.create({
+        data: {
           email,
           name,
           role: email === "2pack25rap@gmail.com" ? "admin" : "user",
           password: null, // Set to null instead of empty string to avoid CHECK constraints
-        })
-        .returning();
+        }
+      });
       
       logger.info({ userId: user.id, email }, "Auto-provisioned user from Supabase token");
     }
@@ -157,22 +152,22 @@ export const authMiddleware = async (
 
     // Self-healing: associate orphaned records with the authenticated user
     try {
-      await db
-        .update(knowledgeItemsTable)
-        .set({ userId: finalUserId })
-        .where(isNull(knowledgeItemsTable.userId));
-      await db
-        .update(categoriesTable)
-        .set({ userId: finalUserId })
-        .where(isNull(categoriesTable.userId));
-      await db
-        .update(tagsTable)
-        .set({ userId: finalUserId })
-        .where(isNull(tagsTable.userId));
-      await db
-        .update(noteGroupsTable)
-        .set({ userId: finalUserId })
-        .where(isNull(noteGroupsTable.userId));
+      await prisma.knowledge_items.updateMany({
+        where: { user_id: null },
+        data: { user_id: finalUserId }
+      });
+      await prisma.categories.updateMany({
+        where: { user_id: null },
+        data: { user_id: finalUserId }
+      });
+      await prisma.tags.updateMany({
+        where: { user_id: null },
+        data: { user_id: finalUserId }
+      });
+      await prisma.note_groups.updateMany({
+        where: { user_id: null },
+        data: { user_id: finalUserId }
+      });
     } catch (dbErr) {
       logger.error({ err: dbErr }, "Failed to run self-healing on orphaned records");
     }
