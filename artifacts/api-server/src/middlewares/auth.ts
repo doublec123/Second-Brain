@@ -1,4 +1,4 @@
-import { type Request, type Response, type NextFunction } from 'express'
+import { type Request, type Response as ExpressResponse, type NextFunction } from 'express'
 import { prisma } from '../lib/prisma.js'
 import { logger } from '../lib/logger.js'
 import jwt from 'jsonwebtoken'
@@ -38,7 +38,7 @@ async function verifyToken(token: string): Promise<{ sub: string; email: string;
   return null
 }
 
-export const authMiddleware = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+export const authMiddleware = async (req: AuthenticatedRequest, res: ExpressResponse, next: NextFunction): Promise<void> => {
   const authHeader = req.headers['authorization'] as string | undefined
   if (!authHeader?.startsWith('Bearer ')) { next(); return }
   const token = authHeader.split(' ')[1]
@@ -58,12 +58,12 @@ export const authMiddleware = async (req: AuthenticatedRequest, res: Response, n
   next()
 }
 
-export function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+export function requireAuth(req: AuthenticatedRequest, res: ExpressResponse, next: NextFunction): void {
   if (!req.user) { res.status(401).json({ error: 'Unauthorized' }); return }
   next()
 }
 
-export function requireAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+export function requireAdmin(req: AuthenticatedRequest, res: ExpressResponse, next: NextFunction): void {
   if (!req.user || req.user.role !== 'admin') { res.status(403).json({ error: 'Forbidden' }); return }
   next()
 }
