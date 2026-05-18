@@ -6,5 +6,13 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.ts" },
     { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  ],
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": [
+        "prisma.config.ts",
+        "prisma/schema.prisma"
+      ]
+    }
+  }
 }
