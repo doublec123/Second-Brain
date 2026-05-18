@@ -5,7 +5,7 @@
     "esModuleInterop": true,
     "noEmit": false,
     "outDir": "../dist/api",
-    "types": ["node"]
+    "types": []
   },
   "include": ["./**/*.ts"],
   "exclude": []
