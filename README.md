@@ -22,6 +22,8 @@ Second Brain is an AI-powered personal knowledge management system that turns ra
 ## 📸 Preview
 
 The dashboard gives you an at-a-glance view of everything you've captured — recent items, their AI-generated summaries, tags, and processing status — plus a breakdown of your knowledge by content type.
+<img width="1897" height="923" alt="image" src="https://github.com/user-attachments/assets/bee4c787-d6da-47dc-9d42-babdc78b7f20" />
+
 
 ## 🛠️ Tech Stack
 
